@@ -149,5 +149,8 @@ Jika Anda adalah **AI Agent** atau **Developer baru** yang melanjutkan proyek in
    Pause setelah ~10x bacaan BPM adalah perilaku duty-cycle alami dari firmware Infinix XWatch H4. **Jangan menambah timer re-trigger periodik** untuk memaksa jam membaca terus-menerus.
 3. **STRATEGI REALTIME**:
    Proyek ini menggunakan **REST API (POST & GET)** dengan polling/pull-to-refresh. Jangan mencoba mengimplementasikan Server-Sent Events (SSE) atau WebSocket kecuali diminta secara eksplisit.
-4. **PEMELIHARAAN KODE**:
+4. **PEMISAHAN UI (DART/FLUTTER) VS BACKEND (LARAVEL REST API)**:
+   - **UI 100% Flutter (Dart)**: Seluruh tampilan antarmuka (Dashboard, Grafik, Device Picker Modal, Status Sensor, Form Auth/Profil) **WAJIB HANYA** dibuat di Flutter menggunakan bahasa **Dart** (`lib/`).
+   - **Laravel 100% Headless REST API (PHP)**: Laravel (`siband-backend/`) **HANYA** berfungsi sebagai Headless REST API yang mengembalikan response JSON dan mengelola database SQLite. **DILARANG MEMBUAT TAMPILAN UI ATAU TEMPLATE BLADE DI LARAVEL** untuk kebutuhan aplikasi mobile ini.
+5. **PEMELIHARAAN KODE**:
    Pastikan setiap kali melakukan perubahan, jalankan `flutter analyze` dan pastikan hasil analisis tetap **No issues found! (0 errors, 0 warnings)**.
