@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../services/ble_service.dart';
+import 'login_screen.dart';
 
 enum Mode { dummy, ble }
 enum HrSensorStatus { measuring, resting, disconnected }
@@ -382,6 +384,19 @@ class _BpmDashboardScreenState extends State<BpmDashboardScreen> {
         title: const Text('CalmiBand Monitor'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Keluar',
+            onPressed: () async {
+              await AuthService().logout();
+              if (context.mounted) {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                );
+              }
+            },
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 8.0),
             child: SegmentedButton<Mode>(

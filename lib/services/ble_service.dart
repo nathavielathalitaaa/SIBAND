@@ -155,6 +155,9 @@ class BleService {
       List<BluetoothService> services = await device.discoverServices();
       debugPrint("[BLE] Jumlah service ditemukan: ${services.length}");
 
+      // Explorasi service & characteristic untuk investigasi suhu tubuh & sensor lain
+      unawaited(exploreServices(services));
+
       // Trigger pengukuran kontinu via 0xFEEA custom service
       await triggerContinuousHrMeasurement(device);
 
@@ -239,6 +242,59 @@ class BleService {
     }
   }
 
+  /// Explorasi lengkap semua service & characteristic (khususnya 0xFEE7, 0x190E, 0xAE00, dll)
+  Future<void> exploreServices(List<BluetoothService> services) async {
+    debugPrint("[BLE][EXPLORE] === START ENUMERASI SERVICES & CHARACTERISTICS ===");
+    for (final service in services) {
+      final sUuid = service.uuid.toString().toLowerCase();
+      debugPrint("[BLE][EXPLORE] Service Found: $sUuid");
+
+      for (final c in service.characteristics) {
+        final cUuid = c.uuid.toString().toLowerCase();
+        final read = c.properties.read;
+        final write = c.properties.write || c.properties.writeWithoutResponse;
+        final notify = c.properties.notify;
+        final indicate = c.properties.indicate;
+
+        debugPrint(
+          "[BLE][EXPLORE] Service $sUuid > Char $cUuid | props: read=$read write=$write notify=$notify indicate=$indicate",
+        );
+
+        if (read) {
+          try {
+            final value = await c.read();
+            final hex = value.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+            debugPrint("[BLE][EXPLORE] Char $cUuid value: $hex (raw: $value)");
+          } catch (e) {
+            debugPrint("[BLE][EXPLORE] Gagal read Char $cUuid: $e");
+          }
+        }
+
+        if (notify || indicate) {
+          try {
+            await c.setNotifyValue(true);
+            final sub = c.onValueReceived.listen((value) {
+              final hex = value.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+              debugPrint("[BLE][EXPLORE] NOTIFY Char $cUuid value: $hex (raw: $value)");
+            });
+
+            // Auto-unsubscribe setelah 30 detik untuk explorasi sementara
+            Future.delayed(const Duration(seconds: 30), () async {
+              try {
+                await sub.cancel();
+                await c.setNotifyValue(false);
+                debugPrint("[BLE][EXPLORE] Unsubscribed notify Char $cUuid");
+              } catch (_) {}
+            });
+          } catch (e) {
+            debugPrint("[BLE][EXPLORE] Gagal setNotifyValue Char $cUuid: $e");
+          }
+        }
+      }
+    }
+    debugPrint("[BLE][EXPLORE] === SELESAI ENUMERASI SERVICES ===");
+  }
+
   int? _parseHeartRate(List<int> value) {
     if (value.isEmpty) {
       debugPrint("[BLE] Notifikasi kosong (0 bytes), dilewati.");
@@ -250,18 +306,45 @@ class BleService {
     }
 
     int flags = value[0];
-    bool isUint16 = (flags & 0x01) == 1;
+    final String flagsBin = flags.toRadixString(2).padLeft(8, '0');
+    final bool isUint16 = (flags & 0x01) != 0;
+    final bool hasEnergyExpended = (flags & 0x08) != 0;
+    final bool hasRrInterval = (flags & 0x10) != 0;
+
+    debugPrint("[BLE][EXPLORE][RR] Full Flags Byte: $flagsBin (0x${flags.toRadixString(16).padLeft(2, '0')})");
+    debugPrint("[BLE][EXPLORE][RR] Bit 0x10 set (RR-Interval Present): $hasRrInterval");
+
+    int bpm;
+    int offset = 1;
 
     if (isUint16) {
       if (value.length < 3) {
         debugPrint("[BLE] Flags mengindikasikan UINT16 tetapi panjang data < 3 byte.");
         return null;
       }
-      int bpm = value[1] | (value[2] << 8);
-      return bpm;
+      bpm = value[1] | (value[2] << 8);
+      offset += 2;
     } else {
-      int bpm = value[1];
-      return bpm;
+      bpm = value[1];
+      offset += 1;
     }
+
+    if (hasEnergyExpended) {
+      offset += 2;
+    }
+
+    if (hasRrInterval) {
+      List<int> rrIntervals = [];
+      while (offset + 1 < value.length) {
+        int rr = value[offset] | (value[offset + 1] << 8);
+        rrIntervals.add(rr);
+        offset += 2;
+      }
+      debugPrint("[BLE][EXPLORE][RR] Parsed RR-Interval values (1/1024s): $rrIntervals");
+    } else {
+      debugPrint("[BLE][EXPLORE][RR] Tidak ada RR-Interval pada paket data ini.");
+    }
+
+    return bpm;
   }
 }
