@@ -1,6 +1,6 @@
-# CalmiBand (`SIBAND`)
+# SIBAND
 
-> **CalmiBand** adalah platform pemantauan denyut jantung (*Heart Rate*) dan manajemen kesehatan/stres anak secara *real-time* berbasis IoT Smartband (**Infinix XWatch H4**), aplikasi mobile **Flutter**, dan backend API **Laravel**.
+> **Siband** adalah platform pemantauan denyut jantung (*Heart Rate*) dan manajemen kesehatan/stres anak secara *real-time* berbasis IoT Smartband (**Infinix XWatch H4**), aplikasi mobile **Flutter**, dan backend API **Laravel**.
 
 ---
 
