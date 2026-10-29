@@ -2,10 +2,11 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'config_service.dart';
 
 class AuthService {
-  static const String baseUrl = 'http://127.0.0.1:8000/api';
   static const String tokenKey = 'access_token';
+  final ConfigService _configService = ConfigService();
 
   /// Register user baru, simpan token jika berhasil.
   Future<Map<String, dynamic>> register({
@@ -15,6 +16,7 @@ class AuthService {
     required String passwordConfirmation,
   }) async {
     try {
+      final baseUrl = await _configService.getBaseUrl();
       final url = Uri.parse('$baseUrl/register');
       final response = await http.post(
         url,
@@ -65,6 +67,7 @@ class AuthService {
     required String password,
   }) async {
     try {
+      final baseUrl = await _configService.getBaseUrl();
       final url = Uri.parse('$baseUrl/login');
       final response = await http.post(
         url,
@@ -112,6 +115,7 @@ class AuthService {
     try {
       final token = await getToken();
       if (token != null && token.isNotEmpty) {
+        final baseUrl = await _configService.getBaseUrl();
         final url = Uri.parse('$baseUrl/logout');
         await http.post(
           url,
@@ -140,10 +144,36 @@ class AuthService {
     return prefs.getString(tokenKey);
   }
 
-  /// Cek apakah user sedang login (ada token tersimpan).
+  /// Cek apakah user sedang login dengan validasi token ke server.
   Future<bool> isLoggedIn() async {
     final token = await getToken();
-    return token != null && token.isNotEmpty;
+    if (token == null || token.isEmpty) return false;
+
+    try {
+      final baseUrl = await _configService.getBaseUrl();
+      final url = Uri.parse('$baseUrl/user');
+      final response = await http.get(
+        url,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 401) {
+        // Token sudah revoke/expired di server, hapus token lokal
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(tokenKey);
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      // Gagal konek ke server (offline dll) - jangan paksa logout,
+      // anggap tetap login berdasarkan token lokal
+      debugPrint('[AuthService] Gagal validasi token ke server: $e');
+      return true;
+    }
   }
 
   /// Parse error response dari Laravel (termasuk 422 validation errors).

@@ -6,6 +6,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/ble_service.dart';
+import '../services/config_service.dart';
 import 'login_screen.dart';
 
 enum Mode { dummy, ble }
@@ -40,6 +41,43 @@ class _BpmDashboardScreenState extends State<BpmDashboardScreen> {
   final List<FlSpot> _spots = [];
   int _pointCounter = 0;
   bool _isLoadingHistory = false;
+  int? _selectedRangeHours; // null = semua
+
+  double get _avgBpm {
+    if (_spots.isEmpty) return 0;
+    return _spots.map((s) => s.y).reduce((a, b) => a + b) / _spots.length;
+  }
+
+  int get _minBpm {
+    if (_spots.isEmpty) return 0;
+    return _spots.map((s) => s.y.toInt()).reduce((a, b) => a < b ? a : b);
+  }
+
+  int get _maxBpm {
+    if (_spots.isEmpty) return 0;
+    return _spots.map((s) => s.y.toInt()).reduce((a, b) => a > b ? a : b);
+  }
+
+  Widget _buildStatChip(String label, String value, Color color) {
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          children: [
+            Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
+            const SizedBox(height: 2),
+            Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade700)),
+          ],
+        ),
+      ),
+    );
+  }
 
   HrSensorStatus get _sensorStatus {
     if (_currentBleState != BluetoothConnectionState.connected) {
@@ -332,7 +370,7 @@ class _BpmDashboardScreenState extends State<BpmDashboardScreen> {
       _isLoadingHistory = true;
     });
 
-    final history = await _apiService.getHeartRateHistory();
+    final history = await _apiService.getHeartRateHistory(hours: _selectedRangeHours);
 
     if (!mounted) return;
 
@@ -375,6 +413,63 @@ class _BpmDashboardScreenState extends State<BpmDashboardScreen> {
     }
   }
 
+  Future<void> _showServerConfigDialog() async {
+    final configService = ConfigService();
+    final currentUrl = await configService.getBaseUrl();
+    final controller = TextEditingController(text: currentUrl);
+
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Pengaturan Server API'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Masukkan API Base URL (misal: http://192.168.1.10:8000/api)',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: 'Base URL',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await configService.setBaseUrl(controller.text);
+              if (ctx.mounted) {
+                Navigator.pop(ctx);
+              }
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Base URL disimpan. Restart koneksi/reload halaman jika diperlukan.',
+                    ),
+                  ),
+                );
+              }
+            },
+            child: const Text('Simpan'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bpmColor = _getBpmColor(_currentBpm);
@@ -384,6 +479,11 @@ class _BpmDashboardScreenState extends State<BpmDashboardScreen> {
         title: const Text('CalmiBand Monitor'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Pengaturan Server',
+            onPressed: _showServerConfigDialog,
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Keluar',
@@ -536,6 +636,14 @@ class _BpmDashboardScreenState extends State<BpmDashboardScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _buildStatChip('Rata-rata', _avgBpm.toStringAsFixed(0), Colors.blue),
+                _buildStatChip('Min', '$_minBpm', Colors.green),
+                _buildStatChip('Max', '$_maxBpm', Colors.red),
+              ],
+            ),
             const SizedBox(height: 24),
             Wrap(
               alignment: WrapAlignment.spaceBetween,
@@ -546,6 +654,17 @@ class _BpmDashboardScreenState extends State<BpmDashboardScreen> {
                 const Text(
                   'Grafik Riwayat BPM',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                DropdownButton<int?>(
+                  value: _selectedRangeHours,
+                  hint: const Text('Rentang'),
+                  items: const [
+                    DropdownMenuItem(value: null, child: Text('Semua')),
+                    DropdownMenuItem(value: 1, child: Text('1 Jam')),
+                    DropdownMenuItem(value: 6, child: Text('6 Jam')),
+                    DropdownMenuItem(value: 24, child: Text('24 Jam')),
+                  ],
+                  onChanged: (val) => setState(() => _selectedRangeHours = val),
                 ),
                 ElevatedButton.icon(
                   onPressed: _isLoadingHistory ? null : _fetchHistoryFromServer,

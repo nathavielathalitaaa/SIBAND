@@ -155,9 +155,6 @@ class BleService {
       List<BluetoothService> services = await device.discoverServices();
       debugPrint("[BLE] Jumlah service ditemukan: ${services.length}");
 
-      // Explorasi service & characteristic untuk investigasi suhu tubuh & sensor lain
-      unawaited(exploreServices(services));
-
       // Trigger pengukuran kontinu via 0xFEEA custom service
       await triggerContinuousHrMeasurement(device);
 
@@ -212,6 +209,10 @@ class BleService {
 
       await hrChar.setNotifyValue(true);
 
+      // Explorasi service & characteristic untuk investigasi suhu tubuh & sensor lain
+      // (dijalankan setelah listener HR utama aktif agar tidak bersaing dengan setup awal)
+      unawaited(exploreServices(services));
+
     } catch (e) {
       debugPrint("[BLE] Error koneksi BLE: $e");
       if (_bpmController != null && !_bpmController!.isClosed) {
@@ -226,6 +227,12 @@ class BleService {
 
       await _notifySubscription?.cancel();
       _notifySubscription = null;
+
+      await _feeaNotifySubscription?.cancel();
+      _feeaNotifySubscription = null;
+
+      _feeaWriteChar = null;
+      _feeaNotifyChar = null;
 
       if (_connectedDevice != null) {
         debugPrint("[BLE] Disconnecting dari ${_connectedDevice!.remoteId}...");

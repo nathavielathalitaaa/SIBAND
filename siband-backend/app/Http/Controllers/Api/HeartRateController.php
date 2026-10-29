@@ -17,6 +17,8 @@ class HeartRateController extends Controller
             'recorded_at' => 'required|date',
         ]);
 
+        $validated['user_id'] = $request->user()->id;
+
         $log = HeartRateLog::create($validated);
 
         return response()->json([
@@ -27,8 +29,12 @@ class HeartRateController extends Controller
 
     public function index(Request $request)
     {
-        $logs = HeartRateLog::latest('recorded_at')->limit(100)->get();
+        $query = HeartRateLog::where('user_id', $request->user()->id)->latest('recorded_at');
 
-        return response()->json($logs, 200);
+        if ($request->filled('hours')) {
+            $query->where('recorded_at', '>=', now()->subHours((int) $request->hours));
+        }
+
+        return response()->json($query->limit(100)->get(), 200);
     }
 }
