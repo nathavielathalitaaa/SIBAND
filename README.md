@@ -30,7 +30,7 @@ Sistem terdiri dari 3 lapisan utama:
                                                                         ┌─────────────────────────┐
                                                                         │   Laravel 13 REST API   │
                                                                         │   (siband-backend)      │
-                                                                        │   SQLite Database       │
+                                                                        │   MySQL Database        │
                                                                         └─────────────────────────┘
 ```
 
@@ -46,7 +46,7 @@ Sistem terdiri dari 3 lapisan utama:
 
 > ⚠️ **IMPORTANT HARDWARE BEHAVIOR (PERHATIAN PENTING UNTUK AI & DEVELOPER)**:
 > Sensor Heart Rate pada Infinix XWatch H4 memiliki pola **duty-cycle alami dari firmware jam**:
-> - Jam akan membaca data BPM selama **~10-15 kali pembacaan kontinyu**, lalu berhenti sejenak (**~60 detik pause/resting**), kemudian otomatis melanjutkan membaca lagi.
+> - Jam akan membaca data BPM selama **~10-15 kali pembacaan kontinyu**, lalu berhenti sejenak (**~5 menit pause/resting**), kemudian otomatis melanjutkan membaca lagi.
 > - **INI BUKAN BUG ATAU KONEKSI PUTUS!** Jangan pernah menganggap ini error dan **jangan mencoba menambalnya dengan re-trigger periodik**, karena itu adalah mekanisme hemat daya alami dari firmware Infinix.
 
 ---
@@ -145,7 +145,7 @@ Jika Anda adalah **AI Agent** atau **Developer baru** yang melanjutkan proyek in
 
 1. **JANGAN UBAH LOGIK TRIGGER BLE**:
    Jangan mengubah payload atau alur pemanggilan `triggerContinuousHrMeasurement()` dan `stopHrMeasurement()` di [`lib/services/ble_service.dart`](lib/services/ble_service.dart).
-2. **JANGAN COBA MEMPERBAIKI PAUSE ~60 DETIK JAM**:
+2. **JANGAN COBA MEMPERBAIKI PAUSE ~5 MENIT JAM**:
    Pause setelah ~10x bacaan BPM adalah perilaku duty-cycle alami dari firmware Infinix XWatch H4. **Jangan menambah timer re-trigger periodik** untuk memaksa jam membaca terus-menerus.
 3. **STRATEGI REALTIME**:
    Proyek ini menggunakan **REST API (POST & GET)** dengan polling/pull-to-refresh. Jangan mencoba mengimplementasikan Server-Sent Events (SSE) atau WebSocket kecuali diminta secara eksplisit.

@@ -9,6 +9,8 @@ class HeartRateLog extends Model
 {
     protected $fillable = [
         'user_id',
+        'child_id',
+        'device_id',
         'device_name',
         'device_mac',
         'bpm',
@@ -25,5 +27,15 @@ class HeartRateLog extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function child(): BelongsTo
+    {
+        return $this->belongsTo(Child::class);
+    }
+
+    public function device(): BelongsTo
+    {
+        return $this->belongsTo(Device::class);
     }
 }
