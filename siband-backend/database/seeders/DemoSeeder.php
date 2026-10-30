@@ -48,5 +48,9 @@ class DemoSeeder extends Seeder
                 'recorded_at' => $timestamp,
             ]);
         }
+        // Event notes demo
+        \App\Models\EventNote::factory()->count(5)->create([
+            'child_id' => $child->id,
+        ]);
     }
 }
