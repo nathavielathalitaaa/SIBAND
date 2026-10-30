@@ -15,7 +15,7 @@ class DeviceController extends Controller
     /**
      * List devices belonging to the authenticated user's children.
      */
-    public function index(): Response
+    public function index(): JsonResponse
     {
         $user = Auth::user();
         $devices = Device::whereHas('child', function ($q) use ($user) {
@@ -97,7 +97,7 @@ class DeviceController extends Controller
     /**
      * Show a specific device if it belongs to the user's child.
      */
-    public function show(string $id): Response
+    public function show(string $id): JsonResponse
     {
         $user = Auth::user();
         $device = Device::where('id', $id)
@@ -106,10 +106,11 @@ class DeviceController extends Controller
         return response()->json($device);
     }
 
+
     /**
      * Update a device with ownership check.
      */
-    public function update(Request $request, string $id): Response
+    public function update(Request $request, string $id): JsonResponse
     {
         $user = Auth::user();
         $device = Device::where('id', $id)
@@ -129,7 +130,7 @@ class DeviceController extends Controller
     /**
      * Delete a device with ownership verification.
      */
-    public function destroy(string $id): Response
+    public function destroy(string $id): JsonResponse
     {
         $user = Auth::user();
         $device = Device::where('id', $id)
