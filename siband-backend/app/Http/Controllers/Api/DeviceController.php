@@ -8,6 +8,7 @@ use App\Models\Child;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Response;
+use Illuminate\Http\JsonResponse;
 
 class DeviceController extends Controller
 {
@@ -22,6 +23,54 @@ class DeviceController extends Controller
         })->get();
         return response()->json($devices);
     }
+
+    /**
+     * Pair a device to a child owned by the authenticated user.
+     * If a device with the same MAC already exists for this user, reassign it.
+     */
+
+    public function pair(Request $request): JsonResponse
+    {
+        $request->validate([
+            'mac' => 'required|string',
+            'name' => 'required|string',
+            'child_id' => 'required|integer|exists:children,id',
+        ]);
+
+        $user = Auth::user();
+        // Verify child belongs to the authenticated user
+        $child = Child::find($request->input('child_id'));
+        if (! $child || $child->user_id !== $user->id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        // Check if a device with the same MAC already exists
+        $existingDevice = Device::where('mac', $request->input('mac'))->first();
+        if ($existingDevice) {
+            $ownerUserId = $existingDevice->child->user_id ?? null;
+            if ($ownerUserId && $ownerUserId !== $user->id) {
+                // The MAC belongs to a child of another user – reject
+                return response()->json(['message' => 'Device already paired to another user'], 403);
+            }
+            // Device belongs to the same user – allow reassign to the requested child
+            $existingDevice->update([
+                'child_id' => $child->id,
+                'name' => $request->input('name'),
+            ]);
+            return response()->json($existingDevice);
+        }
+
+        // No existing device – create new one
+        $device = Device::create([
+            'mac' => $request->input('mac'),
+            'name' => $request->input('name'),
+            'child_id' => $child->id,
+        ]);
+        return response()->json($device, 201);
+    }
+
+
+
 
     /**
      * Store a new device for a child owned by the user.

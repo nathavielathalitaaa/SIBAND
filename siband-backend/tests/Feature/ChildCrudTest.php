@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Models\Child;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -12,7 +13,7 @@ class ChildCrudTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
+    #[Test]
     public function user_can_crud_own_child()
     {
         // Create a user and authenticate
@@ -37,7 +38,7 @@ class ChildCrudTest extends TestCase
         $this->deleteJson("/api/children/{$childId}")->assertStatus(200);
     }
 
-    /** @test */
+    #[Test]
     public function other_user_cannot_access_foreign_child()
     {
         $owner = User::factory()->create();

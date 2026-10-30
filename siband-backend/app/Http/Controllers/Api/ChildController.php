@@ -43,7 +43,10 @@ class ChildController extends Controller
     public function show(string $id)
     {
         $user = Auth::user();
-        $child = Child::where('id', $id)->where('user_id', $user->id)->firstOrFail();
+        $child = Child::find($id);
+        if (! $child || $child->user_id !== $user->id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
         return response()->json($child);
     }
 
@@ -53,7 +56,10 @@ class ChildController extends Controller
     public function update(Request $request, string $id)
     {
         $user = Auth::user();
-        $child = Child::where('id', $id)->where('user_id', $user->id)->firstOrFail();
+        $child = Child::find($id);
+        if (! $child || $child->user_id !== $user->id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
         $request->validate([
             'nickname' => 'sometimes|required|string',
             'birth_year' => 'sometimes|required|integer',
@@ -68,7 +74,10 @@ class ChildController extends Controller
     public function destroy(string $id)
     {
         $user = Auth::user();
-        $child = Child::where('id', $id)->where('user_id', $user->id)->firstOrFail();
+        $child = Child::find($id);
+        if (! $child || $child->user_id !== $user->id) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
         $child->delete();
         return response()->json(['message' => 'Deleted']);
     }

@@ -1,16 +1,23 @@
 <?php
 
-/** @var \Illuminate\Database\Eloquent\Factory\Factory $factory */
+namespace Database\Factories;
 
 use App\Models\Device;
 use App\Models\Child;
-use Faker\Generator as Faker;
+use Illuminate\Database\Eloquent\Factories\Factory;
 
-$factory->define(Device::class, function (Faker $faker) {
-    return [
-        'child_id' => Child::factory(),
-        'name' => $faker->word . ' Watch',
-        'mac' => strtoupper(implode(':', str_split($faker->hexcolor, 2))),
-        'last_seen_at' => now(),
-    ];
-});
+/** @extends Factory<Device> */
+class DeviceFactory extends Factory
+{
+    protected $model = Device::class;
+
+    public function definition()
+    {
+        return [
+            'child_id' => Child::factory(),
+            'name' => $this->faker->word . ' Watch',
+            'mac' => strtoupper(implode(':', str_split($this->faker->hexcolor, 2))),
+            'last_seen_at' => now(),
+        ];
+    }
+}

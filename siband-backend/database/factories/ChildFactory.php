@@ -1,15 +1,22 @@
 <?php
 
-/** @var \Illuminate\Database\Eloquent\Factory\Factory $factory */
+namespace Database\Factories;
 
 use App\Models\Child;
 use App\Models\User;
-use Faker\Generator as Faker;
+use Illuminate\Database\Eloquent\Factories\Factory;
 
-$factory->define(Child::class, function (Faker $faker) {
-    return [
-        'user_id' => User::factory(),
-        'nickname' => $faker->firstName,
-        'birth_year' => $faker->numberBetween(2010, 2022),
-    ];
-});
+/** @extends \Illuminate\Database\Eloquent\Factories\Factory<Child> */
+class ChildFactory extends Factory
+{
+    protected $model = Child::class;
+
+    public function definition()
+    {
+        return [
+            'user_id' => User::factory(),
+            'nickname' => $this->faker->firstName,
+            'birth_year' => $this->faker->numberBetween(2010, 2022),
+        ];
+    }
+}
