@@ -75,7 +75,7 @@ class DeviceController extends Controller
     /**
      * Store a new device for a child owned by the user.
      */
-    public function store(Request $request): Response
+    public function store(Request $request): JsonResponse
     {
         $request->validate([
             'child_id' => 'required|integer|exists:children,id',
