@@ -17,7 +17,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/heart-rate', [HeartRateController::class, 'store']);
     Route::get('/heart-rate', [HeartRateController::class, 'index']);
     Route::apiResource('children', \App\Http\Controllers\Api\ChildController::class);
-    Route::post('/devices/pair', [App\Http\Controllers\Api\DeviceController::class, 'pair']);
+    Route::get('/children/{child}/baseline', [App\Http\Controllers\Api\BaselineController::class, 'index']);
     // Event notes routes
     Route::get('/children/{child}/event-notes', [EventNoteController::class, 'index']);
     Route::post('/children/{child}/event-notes', [EventNoteController::class, 'store']);
