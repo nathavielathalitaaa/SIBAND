@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\Child;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -35,5 +36,10 @@ class User extends Authenticatable
     public function heartRateLogs(): HasMany
     {
         return $this->hasMany(HeartRateLog::class);
+    }
+
+    public function children(): HasMany
+    {
+        return $this->hasMany(Child::class);
     }
 }
