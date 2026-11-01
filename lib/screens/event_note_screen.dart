@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../utils/event_type_helper.dart';
+import 'event_note_success_screen.dart';
 import 'onboarding_screen.dart';
 
 class EventNoteScreen extends StatefulWidget {
   final int childId;
+  final String initialType;
 
   const EventNoteScreen({
     super.key,
     required this.childId,
+    this.initialType = 'suara_keras',
   });
 
   @override
@@ -21,41 +25,16 @@ class _EventNoteScreenState extends State<EventNoteScreen> {
   final TextEditingController _noteController = TextEditingController();
 
   DateTime _selectedDateTime = DateTime.now();
-  String _selectedType = 'suara_keras'; // Default Suara keras sesuai desain
+  late String _selectedType;
   bool _isSubmitting = false;
 
-  final List<Map<String, dynamic>> _eventTypes = [
-    {
-      'type': 'suara_keras',
-      'label': 'Suara keras',
-      'icon': Icons.volume_up_outlined,
-    },
-    {
-      'type': 'perubahan_aktivitas',
-      'label': 'Perubahan aktivitas',
-      'icon': Icons.alt_route_rounded,
-    },
-    {
-      'type': 'transisi',
-      'label': 'Transisi kegiatan',
-      'icon': Icons.swap_horiz_rounded,
-    },
-    {
-      'type': 'aktivitas_sulit',
-      'label': 'Aktivitas sulit',
-      'icon': Icons.sentiment_dissatisfied_outlined,
-    },
-    {
-      'type': 'interaksi_sosial',
-      'label': 'Interaksi sosial',
-      'icon': Icons.people_outline_rounded,
-    },
-    {
-      'type': 'lainnya',
-      'label': 'Lainnya',
-      'icon': Icons.more_horiz_rounded,
-    },
-  ];
+  final List<Map<String, dynamic>> _eventTypes = kEventTypes;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedType = widget.initialType;
+  }
 
   @override
   void dispose() {
@@ -152,13 +131,16 @@ class _EventNoteScreenState extends State<EventNoteScreen> {
     });
 
     if (result['success'] == true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Catatan tersimpan'),
-          backgroundColor: Color(0xFF1F5C4A),
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => EventNoteSuccessScreen(
+            type: _selectedType,
+            note: _noteController.text.trim(),
+            occurredAt: _selectedDateTime,
+          ),
         ),
       );
-      Navigator.pop(context, true);
     } else {
       final msg = result['message']?.toString() ?? 'Gagal menyimpan catatan';
       if (msg.contains('Unauthenticated') || msg.contains('Sesi telah berakhir')) {
