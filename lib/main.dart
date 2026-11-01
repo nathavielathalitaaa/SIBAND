@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/bpm_dashboard_screen.dart';
+import 'screens/main_navigation_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'services/auth_service.dart';
 
@@ -56,7 +56,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
         }
 
         if (snapshot.data == true) {
-          return const BpmDashboardScreen();
+          return const MainNavigationScreen();
         }
 
         return const OnboardingScreen();
