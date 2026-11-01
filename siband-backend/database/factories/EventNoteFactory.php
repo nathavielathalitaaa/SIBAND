@@ -19,7 +19,7 @@ class EventNoteFactory extends Factory
     {
         return [
             'child_id' => \App\Models\Child::factory(),
-            'type' => $this->faker->randomElement(['transisi', 'suara_keras', 'meltdown', 'aktivitas_fisik', 'lainnya']),
+            'type' => $this->faker->randomElement(EventNote::TYPES),
             'note' => $this->faker->optional()->sentence(),
             'occurred_at' => $this->faker->dateTimeBetween('-1 month', 'now'),
         ];

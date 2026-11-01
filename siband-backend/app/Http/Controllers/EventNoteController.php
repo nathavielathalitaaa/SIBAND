@@ -32,7 +32,7 @@ class EventNoteController extends Controller
     public function store(Request $request, string $child): JsonResponse
     {
         $validated = $request->validate([
-            'type' => ['required', Rule::in(['transisi', 'suara_keras', 'meltdown', 'aktivitas_fisik', 'lainnya'])],
+            'type' => ['required', Rule::in(EventNote::TYPES)],
             'note' => ['nullable', 'string', 'max:500'],
             'occurred_at' => ['nullable', 'date'],
         ]);
