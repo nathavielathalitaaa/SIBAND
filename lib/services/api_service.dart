@@ -115,7 +115,10 @@ class ApiService {
   Future<List<ChildModel>> getChildren() async {
     try {
       final token = await _authService.getToken();
-      if (token == null || token.isEmpty) return [];
+      if (token == null || token.isEmpty) {
+        debugPrint('[ApiService] Token null/kosong, getChildren dibatalkan.');
+        throw Exception('Token tidak ditemukan atau sesi telah berakhir');
+      }
 
       final baseUrl = await _configService.getBaseUrl();
       final url = Uri.parse('$baseUrl/children');
@@ -130,11 +133,12 @@ class ApiService {
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((json) => ChildModel.fromJson(json as Map<String, dynamic>)).toList();
+      } else {
+        throw Exception('Server mengembalikan status ${response.statusCode}');
       }
-      return [];
     } catch (e) {
       debugPrint('[ApiService] Error fetching children: $e');
-      return [];
+      rethrow;
     }
   }
 

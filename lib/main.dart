@@ -49,10 +49,15 @@ class _AuthWrapperState extends State<AuthWrapper> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
+            backgroundColor: Color(0xFFF6F4EF),
             body: Center(
-              child: CircularProgressIndicator(color: Colors.teal),
+              child: CircularProgressIndicator(color: Color(0xFF1F5C4A)),
             ),
           );
+        }
+
+        if (snapshot.hasError) {
+          return const OnboardingScreen();
         }
 
         if (snapshot.data == true) {

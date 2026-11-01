@@ -9,12 +9,16 @@ class MainNavigationScreen extends StatefulWidget {
   final int initialIndex;
   final List<ChildModel>? initialChildren;
   final String? initialUserName;
+  final String? initialErrorMessage;
+  final Future<List<ChildModel>> Function()? onFetchChildren;
 
   const MainNavigationScreen({
     super.key,
     this.initialIndex = 0,
     this.initialChildren,
     this.initialUserName,
+    this.initialErrorMessage,
+    this.onFetchChildren,
   });
 
   @override
@@ -43,6 +47,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         onNavigateToPanduan: () => _onTabSelected(1),
         initialChildren: widget.initialChildren,
         initialUserName: widget.initialUserName,
+        initialErrorMessage: widget.initialErrorMessage,
+        onFetchChildren: widget.onFetchChildren,
       ),
       const PlaceholderScreen(
         title: 'Panduan',
@@ -76,9 +82,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     ];
 
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: screens,
+      backgroundColor: const Color(0xFFF6F4EF),
+      body: SizedBox.expand(
+        child: IndexedStack(
+          index: _currentIndex,
+          sizing: StackFit.expand,
+          children: screens,
+        ),
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(

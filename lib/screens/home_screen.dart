@@ -11,12 +11,16 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback? onNavigateToPanduan;
   final List<ChildModel>? initialChildren;
   final String? initialUserName;
+  final String? initialErrorMessage;
+  final Future<List<ChildModel>> Function()? onFetchChildren;
 
   const HomeScreen({
     super.key,
     this.onNavigateToPanduan,
     this.initialChildren,
     this.initialUserName,
+    this.initialErrorMessage,
+    this.onFetchChildren,
   });
 
   @override
@@ -32,6 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<ChildModel> _children = [];
   ChildModel? _activeChild;
   bool _isLoadingChildren = true;
+  String? _errorMessage;
 
   String _userName = 'Orang Tua';
   Map<String, dynamic>? _baselineData;
@@ -45,6 +50,11 @@ class _HomeScreenState extends State<HomeScreen> {
     _hrService.start();
     _hrService.addListener(_onHeartRateUpdate);
 
+    if (widget.initialErrorMessage != null) {
+      _errorMessage = widget.initialErrorMessage;
+      _isLoadingChildren = false;
+    }
+
     if (widget.initialChildren != null) {
       _children = widget.initialChildren!;
       _isLoadingChildren = false;
@@ -57,7 +67,9 @@ class _HomeScreenState extends State<HomeScreen> {
       _userName = widget.initialUserName!;
     }
 
-    _initData();
+    if (widget.initialErrorMessage == null) {
+      _initData();
+    }
 
     // Auto-refresh stats periodically (every 30 seconds)
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
@@ -96,6 +108,14 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _retryInit() async {
+    setState(() {
+      _errorMessage = null;
+      _isLoadingChildren = true;
+    });
+    await _initData();
+  }
+
   Future<void> _fetchUserProfile() async {
     try {
       final user = await _apiService.getUserProfile();
@@ -111,10 +131,16 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchChildren() async {
     setState(() {
       _isLoadingChildren = true;
+      _errorMessage = null;
     });
 
     try {
-      final list = await _apiService.getChildren();
+      final List<ChildModel> list;
+      if (widget.onFetchChildren != null) {
+        list = await widget.onFetchChildren!();
+      } else {
+        list = await _apiService.getChildren();
+      }
       if (!mounted) return;
 
       final prefs = await SharedPreferences.getInstance();
@@ -138,6 +164,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _children = list;
         _activeChild = selectedChild;
         _isLoadingChildren = false;
+        _errorMessage = null;
       });
 
       if (selectedChild != null) {
@@ -147,6 +174,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       setState(() {
         _isLoadingChildren = false;
+        _errorMessage = 'Gagal memuat data anak: ${e.toString().replaceAll("Exception: ", "")}';
       });
     }
   }
@@ -1111,21 +1139,104 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildErrorView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                color: Color(0xFFFFEBEE),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.error_outline_rounded,
+                size: 54,
+                color: Colors.redAccent,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Terjadi kesalahan',
+              style: GoogleFonts.inter(
+                fontSize: 22,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF1E2A24),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _errorMessage ?? 'Gagal memuat data anak. Silakan coba lagi.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: const Color(0xFF6F7B74),
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              height: 50,
+              child: ElevatedButton.icon(
+                onPressed: _retryInit,
+                icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+                label: Text(
+                  'Coba lagi',
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1F5C4A),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_isLoadingChildren) {
-      return const Scaffold(
-        backgroundColor: Color(0xFFF6F4EF),
-        body: Center(
-          child: CircularProgressIndicator(color: Color(0xFF1F5C4A)),
+    if (_isLoadingChildren && _errorMessage == null && _children.isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFF1F5C4A)),
+      );
+    }
+
+    if (_errorMessage != null && _children.isEmpty) {
+      return SafeArea(
+        child: SizedBox.expand(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                child: _buildHeader(),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: _buildErrorView(),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
 
     if (_children.isEmpty) {
-      return Scaffold(
-        backgroundColor: const Color(0xFFF6F4EF),
-        body: SafeArea(
+      return SafeArea(
+        child: SizedBox.expand(
           child: Column(
             children: [
               Padding(
@@ -1143,9 +1254,8 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF6F4EF),
-      body: SafeArea(
+    return SafeArea(
+      child: SizedBox.expand(
         child: LayoutBuilder(
           builder: (context, constraints) {
             final horizontalPadding = constraints.maxWidth * 0.06;
