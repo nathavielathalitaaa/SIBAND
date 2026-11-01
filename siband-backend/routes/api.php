@@ -23,6 +23,7 @@ Route::middleware('auth:sanctum')->group(function () {
         return $request->user();
     });
     Route::post('/heart-rate', [HeartRateController::class, 'store']);
+    Route::post('/devices/pair', [DeviceController::class, 'pair']);
     Route::get('/heart-rate', [HeartRateController::class, 'index']);
     Route::apiResource('children', ChildController::class);
     Route::get('/children/{child}/baseline', [BaselineController::class, 'index']);
