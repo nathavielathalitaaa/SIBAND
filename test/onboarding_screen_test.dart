@@ -1,14 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:siband/screens/login_screen.dart';
 import 'package:siband/screens/onboarding_screen.dart';
 
 void main() {
-  setUp(() {
-    SharedPreferences.setMockInitialValues({});
-  });
-
   Widget buildTestableWidget({Size size = const Size(412, 915)}) {
     return MaterialApp(
       home: MediaQuery(
@@ -51,7 +46,7 @@ void main() {
     expect(find.text('Temani tumbuhnya,\ndengan lebih tenang.'), findsOneWidget);
   });
 
-  testWidgets('Navigates through slides with button and finishes onboarding', (tester) async {
+  testWidgets('Navigates through slides with button and reaches login', (tester) async {
     await tester.pumpWidget(buildTestableWidget());
     await tester.pumpAndSettle();
 
@@ -85,12 +80,10 @@ void main() {
       findsOneWidget,
     );
 
-    // Tap next on Slide 3 -> sets onboarding_done & opens LoginScreen
+    // Tap next on Slide 3 -> opens LoginScreen without writing any flag
     await tester.tap(find.bySemanticsLabel('Lanjut'));
     await tester.pumpAndSettle();
 
-    final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getBool('onboarding_done'), isTrue);
     expect(find.byType(LoginScreen), findsOneWidget);
   });
 
