@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/child_model.dart';
+import 'guide_screen.dart';
 import 'home_screen.dart';
 import 'placeholder_screen.dart';
 import 'profile_screen.dart';
@@ -51,11 +52,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         initialErrorMessage: widget.initialErrorMessage,
         onFetchChildren: widget.onFetchChildren,
       ),
-      const PlaceholderScreen(
-        title: 'Panduan',
-        message: 'Segera hadir',
-        icon: Icons.menu_book_rounded,
-      ),
+      const GuideScreen(),
       RecapScreen(
         initialChildren: widget.initialChildren,
       ),

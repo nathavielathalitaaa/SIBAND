@@ -69,7 +69,7 @@ void main() {
       // Tap Panduan
       await tester.tap(find.text('Panduan'));
       await tester.pumpAndSettle();
-      expect(find.text('Segera hadir'), findsOneWidget);
+      expect(find.text('Panduan menenangkan'), findsOneWidget);
 
       // Tap Rekap
       await tester.tap(find.text('Rekap'));
