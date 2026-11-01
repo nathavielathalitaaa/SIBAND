@@ -29,9 +29,14 @@ class Child extends Model
     {
         return $this->hasMany(HeartRateLog::class);
     }
+
     public function eventNotes()
     {
         return $this->hasMany(EventNote::class);
     }
 
+    public function shareLinks()
+    {
+        return $this->hasMany(ShareLink::class);
+    }
 }
