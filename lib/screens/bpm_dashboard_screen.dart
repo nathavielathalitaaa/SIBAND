@@ -7,7 +7,7 @@ import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/ble_service.dart';
 import '../services/config_service.dart';
-import 'login_screen.dart';
+import 'onboarding_screen.dart';
 
 enum Mode { dummy, ble }
 enum HrSensorStatus { measuring, resting, disconnected }
@@ -490,9 +490,10 @@ class _BpmDashboardScreenState extends State<BpmDashboardScreen> {
             onPressed: () async {
               await AuthService().logout();
               if (context.mounted) {
-                Navigator.pushReplacement(
+                Navigator.pushAndRemoveUntil(
                   context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
+                  MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+                  (route) => false,
                 );
               }
             },
