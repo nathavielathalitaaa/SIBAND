@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/bpm_dashboard_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'services/auth_service.dart';
 
 void main() {
@@ -34,18 +36,34 @@ class AuthWrapper extends StatefulWidget {
 
 class _AuthWrapperState extends State<AuthWrapper> {
   final AuthService _authService = AuthService();
-  late Future<bool> _isLoggedInFuture;
+  late Future<Widget> _initialScreenFuture;
 
   @override
   void initState() {
     super.initState();
-    _isLoggedInFuture = _authService.isLoggedIn();
+    _initialScreenFuture = _resolveInitialScreen();
+  }
+
+  Future<Widget> _resolveInitialScreen() async {
+    final prefs = await SharedPreferences.getInstance();
+    final bool onboardingDone = prefs.getBool('onboarding_done') ?? false;
+
+    if (!onboardingDone) {
+      return const OnboardingScreen();
+    }
+
+    final bool isLoggedIn = await _authService.isLoggedIn();
+    if (isLoggedIn) {
+      return const BpmDashboardScreen();
+    }
+
+    return const LoginScreen();
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<bool>(
-      future: _isLoggedInFuture,
+    return FutureBuilder<Widget>(
+      future: _initialScreenFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -55,8 +73,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
           );
         }
 
-        if (snapshot.data == true) {
-          return const BpmDashboardScreen();
+        if (snapshot.hasData) {
+          return snapshot.data!;
         }
 
         return const LoginScreen();
