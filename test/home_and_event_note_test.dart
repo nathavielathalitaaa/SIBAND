@@ -74,7 +74,7 @@ void main() {
       // Tap Rekap
       await tester.tap(find.text('Rekap'));
       await tester.pumpAndSettle();
-      expect(find.text('Segera hadir'), findsOneWidget);
+      expect(find.text('Riwayat & Rekap'), findsOneWidget);
 
       // Tap GPS
       await tester.tap(find.text('GPS'));

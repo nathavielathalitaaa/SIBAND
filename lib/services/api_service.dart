@@ -314,4 +314,134 @@ class ApiService {
       return {'success': false, 'message': 'Gagal terhubung ke server: $e'};
     }
   }
+
+  /// Ambil rekap bulanan anak (GET /api/children/{child}/recap).
+  Future<Map<String, dynamic>?> getRecap(int childId, {String? month}) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null || token.isEmpty) {
+        return null;
+      }
+
+      final baseUrl = await _configService.getBaseUrl();
+      final url = Uri.parse('$baseUrl/children/$childId/recap').replace(
+        queryParameters: month != null ? {'month': month} : null,
+      );
+
+      final response = await http.get(
+        url,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      } else if (response.statusCode == 401) {
+        throw Exception('Unauthenticated');
+      }
+      return null;
+    } catch (e) {
+      debugPrint('[ApiService] Error fetching recap: $e');
+      rethrow;
+    }
+  }
+
+  /// Ambil daftar tautan berbagi rekap (GET /api/children/{child}/share-links).
+  Future<List<Map<String, dynamic>>> getShareLinks(int childId) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null || token.isEmpty) {
+        return [];
+      }
+
+      final baseUrl = await _configService.getBaseUrl();
+      final url = Uri.parse('$baseUrl/children/$childId/share-links');
+
+      final response = await http.get(
+        url,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else if (response.statusCode == 401) {
+        throw Exception('Unauthenticated');
+      }
+      return [];
+    } catch (e) {
+      debugPrint('[ApiService] Error fetching share links: $e');
+      rethrow;
+    }
+  }
+
+  /// Buat tautan berbagi baru (POST /api/children/{child}/share-links).
+  Future<Map<String, dynamic>?> createShareLink(int childId, {int days = 7}) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null || token.isEmpty) {
+        return null;
+      }
+
+      final baseUrl = await _configService.getBaseUrl();
+      final url = Uri.parse('$baseUrl/children/$childId/share-links');
+
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'days': days}),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      } else if (response.statusCode == 401) {
+        throw Exception('Unauthenticated');
+      }
+      return null;
+    } catch (e) {
+      debugPrint('[ApiService] Error creating share link: $e');
+      rethrow;
+    }
+  }
+
+  /// Cabut tautan berbagi (DELETE /api/share-links/{id}).
+  Future<bool> deleteShareLink(int shareLinkId) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null || token.isEmpty) {
+        return false;
+      }
+
+      final baseUrl = await _configService.getBaseUrl();
+      final url = Uri.parse('$baseUrl/share-links/$shareLinkId');
+
+      final response = await http.delete(
+        url,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return true;
+      } else if (response.statusCode == 401) {
+        throw Exception('Unauthenticated');
+      }
+      return false;
+    } catch (e) {
+      debugPrint('[ApiService] Error deleting share link: $e');
+      rethrow;
+    }
+  }
 }
+

@@ -4,6 +4,7 @@ import '../models/child_model.dart';
 import 'home_screen.dart';
 import 'placeholder_screen.dart';
 import 'profile_screen.dart';
+import 'recap_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final int initialIndex;
@@ -55,10 +56,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         message: 'Segera hadir',
         icon: Icons.menu_book_rounded,
       ),
-      const PlaceholderScreen(
-        title: 'Rekap',
-        message: 'Segera hadir',
-        icon: Icons.bar_chart_rounded,
+      RecapScreen(
+        initialChildren: widget.initialChildren,
       ),
       const PlaceholderScreen(
         title: 'GPS',
