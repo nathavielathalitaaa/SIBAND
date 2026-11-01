@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../models/child_model.dart';
 import 'auth_service.dart';
 import 'config_service.dart';
 
@@ -12,6 +13,8 @@ class ApiService {
     required int bpm,
     String? deviceName,
     String? deviceMac,
+    int? childId,
+    int? deviceId,
   }) async {
     try {
       final token = await _authService.getToken();
@@ -22,6 +25,19 @@ class ApiService {
 
       final baseUrl = await _configService.getBaseUrl();
       final url = Uri.parse('$baseUrl/heart-rate');
+      final payload = <String, dynamic>{
+        'bpm': bpm,
+        'device_name': deviceName,
+        'device_mac': deviceMac,
+        'recorded_at': DateTime.now().toIso8601String(),
+      };
+      if (childId != null) {
+        payload['child_id'] = childId;
+      }
+      if (deviceId != null) {
+        payload['device_id'] = deviceId;
+      }
+
       final response = await http.post(
         url,
         headers: {
@@ -29,12 +45,7 @@ class ApiService {
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: jsonEncode({
-          'bpm': bpm,
-          'device_name': deviceName,
-          'device_mac': deviceMac,
-          'recorded_at': DateTime.now().toIso8601String(),
-        }),
+        body: jsonEncode(payload),
       );
 
       return response.statusCode == 201;
@@ -71,6 +82,232 @@ class ApiService {
     } catch (e) {
       debugPrint('[ApiService] Error fetching heart rate history: $e');
       return [];
+    }
+  }
+
+  /// Ambil profil pengguna (GET /api/user).
+  Future<Map<String, dynamic>?> getUserProfile() async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null || token.isEmpty) return null;
+
+      final baseUrl = await _configService.getBaseUrl();
+      final url = Uri.parse('$baseUrl/user');
+      final response = await http.get(
+        url,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('[ApiService] Error fetching user profile: $e');
+      return null;
+    }
+  }
+
+  /// Ambil daftar anak milik user (GET /api/children).
+  Future<List<ChildModel>> getChildren() async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null || token.isEmpty) return [];
+
+      final baseUrl = await _configService.getBaseUrl();
+      final url = Uri.parse('$baseUrl/children');
+      final response = await http.get(
+        url,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => ChildModel.fromJson(json as Map<String, dynamic>)).toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('[ApiService] Error fetching children: $e');
+      return [];
+    }
+  }
+
+  /// Buat data anak baru (POST /api/children).
+  Future<ChildModel?> createChild({
+    required String nickname,
+    required int birthYear,
+  }) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null || token.isEmpty) return null;
+
+      final baseUrl = await _configService.getBaseUrl();
+      final url = Uri.parse('$baseUrl/children');
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'nickname': nickname,
+          'birth_year': birthYear,
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return ChildModel.fromJson(data);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('[ApiService] Error creating child: $e');
+      return null;
+    }
+  }
+
+  /// Perbarui data anak (PUT /api/children/{id}).
+  Future<ChildModel?> updateChild({
+    required int id,
+    required String nickname,
+    required int birthYear,
+  }) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null || token.isEmpty) return null;
+
+      final baseUrl = await _configService.getBaseUrl();
+      final url = Uri.parse('$baseUrl/children/$id');
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'nickname': nickname,
+          'birth_year': birthYear,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return ChildModel.fromJson(data);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('[ApiService] Error updating child: $e');
+      return null;
+    }
+  }
+
+  /// Hapus data anak (DELETE /api/children/{id}).
+  Future<bool> deleteChild(int id) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null || token.isEmpty) return false;
+
+      final baseUrl = await _configService.getBaseUrl();
+      final url = Uri.parse('$baseUrl/children/$id');
+      final response = await http.delete(
+        url,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('[ApiService] Error deleting child: $e');
+      return false;
+    }
+  }
+
+  /// Ambil statistik baseline anak (GET /api/children/{child}/baseline).
+  Future<Map<String, dynamic>?> getBaseline(int childId, {int days = 7}) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null || token.isEmpty) return null;
+
+      final baseUrl = await _configService.getBaseUrl();
+      final url = Uri.parse('$baseUrl/children/$childId/baseline?days=$days');
+      final response = await http.get(
+        url,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('[ApiService] Error fetching baseline: $e');
+      return null;
+    }
+  }
+
+  /// Simpan catatan kejadian (POST /api/children/{child}/event-notes).
+  Future<Map<String, dynamic>> createEventNote(
+    int childId, {
+    required String type,
+    String? note,
+    DateTime? occurredAt,
+  }) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null || token.isEmpty) {
+        return {'success': false, 'message': 'Sesi telah berakhir, silakan login kembali.'};
+      }
+
+      final baseUrl = await _configService.getBaseUrl();
+      final url = Uri.parse('$baseUrl/children/$childId/event-notes');
+
+      final time = occurredAt ?? DateTime.now();
+      final formattedTime =
+          '${time.year.toString().padLeft(4, '0')}-${time.month.toString().padLeft(2, '0')}-${time.day.toString().padLeft(2, '0')} '
+          '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}:${time.second.toString().padLeft(2, '0')}';
+
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'type': type,
+          if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+          'occurred_at': formattedTime,
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {'success': true, 'message': 'Catatan tersimpan'};
+      } else {
+        String msg = 'Gagal menyimpan catatan';
+        try {
+          final data = jsonDecode(response.body);
+          if (data is Map && data['message'] != null) {
+            msg = data['message'].toString();
+          }
+        } catch (_) {}
+        return {'success': false, 'message': msg};
+      }
+    } catch (e) {
+      debugPrint('[ApiService] Error creating event note: $e');
+      return {'success': false, 'message': 'Gagal terhubung ke server: $e'};
     }
   }
 }
