@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:siband/models/child_model.dart';
 import 'package:siband/screens/event_note_success_screen.dart';
+import 'package:siband/screens/guide_screen.dart';
+import 'package:siband/screens/guide_calming_screen.dart';
+import 'package:siband/screens/guide_done_screen.dart';
 import 'package:siband/screens/recap_screen.dart';
 
 Widget buildTestable(Widget child, {Size size = const Size(360, 640)}) {
@@ -280,6 +283,101 @@ void main() {
       expect(find.text('7 Hari'), findsOneWidget);
     });
   });
+
+  group('Guide Screen & Calming Checklist Tests', () {
+    testWidgets('Tab Panduan menampilkan kartu Panduan menenangkan dan dapat dibuka', (tester) async {
+      await tester.pumpWidget(buildTestable(const GuideScreen()));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Panduan Praktis'), findsOneWidget);
+      expect(find.text('Panduan menenangkan'), findsOneWidget);
+      expect(find.text('Saat anak sedang tantrum'), findsOneWidget);
+
+      await tester.tap(find.text('Panduan menenangkan'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Utamakan aman dan tenang'), findsOneWidget);
+    });
+
+    testWidgets('Checklist menghitung progres dan tombol Selesai aktif saat minimal 1 item dicentang pada 360x640', (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(buildTestable(const GuideCalmingScreen(), size: const Size(360, 640)));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('0 / 6'), findsOneWidget);
+      expect(find.text('Pastikan aman'), findsOneWidget);
+      expect(find.text('Kurangi rangsangan'), findsOneWidget);
+      expect(find.text('Tetap tenang'), findsOneWidget);
+      expect(find.text('Jangan memaksa'), findsOneWidget);
+      expect(find.text('Tawarkan pilihan'), findsOneWidget);
+      expect(find.text('Setelah mereda'), findsOneWidget);
+
+      // Tombol selesai dalam kondisi disable saat 0 dicentang
+      final selesaiBtnFinder = find.widgetWithText(ElevatedButton, 'Selesai');
+      expect(selesaiBtnFinder, findsOneWidget);
+      ElevatedButton btn = tester.widget<ElevatedButton>(selesaiBtnFinder);
+      expect(btn.onPressed, isNull);
+
+      // Centang item 1 (Pastikan aman)
+      await tester.tap(find.text('Pastikan aman'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('1 / 6'), findsOneWidget);
+      btn = tester.widget<ElevatedButton>(selesaiBtnFinder);
+      expect(btn.onPressed, isNotNull);
+
+      // Centang item 2 (Tetap tenang)
+      await tester.tap(find.text('Tetap tenang'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('2 / 6'), findsOneWidget);
+
+      // Scroll ke tombol Selesai dan tekan untuk membuka GuideDoneScreen
+      await tester.ensureVisible(selesaiBtnFinder);
+      await tester.pumpAndSettle();
+      await tester.tap(selesaiBtnFinder);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Kamu sudah mendampingi dengan baik'), findsOneWidget);
+      expect(find.text('Menjaga lingkungan tetap aman'), findsOneWidget);
+      expect(find.text('Menjaga suara tetap lembut'), findsOneWidget);
+      expect(find.text('Apa yang membantu anak hari ini?'), findsOneWidget);
+      expect(find.text('Kembali ke beranda'), findsOneWidget);
+    });
+
+    testWidgets('GuideDoneScreen renders on 412x915 and opens EventNote with Lainnya', (tester) async {
+      tester.view.physicalSize = const Size(412, 915);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(buildTestable(
+        const GuideDoneScreen(
+          checkedItemIds: ['kurangi_rangsangan', 'setelah_mereda'],
+          childId: 1,
+        ),
+        size: const Size(412, 915),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Kamu sudah mendampingi dengan baik'), findsOneWidget);
+      expect(find.text('Mengurangi rangsangan'), findsOneWidget);
+      expect(find.text('Memvalidasi perasaan anak'), findsOneWidget);
+
+      // Ketuk kartu "Apa yang membantu anak hari ini?"
+      await tester.tap(find.text('Apa yang membantu anak hari ini?'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Catatan kejadian'), findsOneWidget);
+      expect(find.text('Lainnya'), findsOneWidget);
+    });
+  });
 }
+
 
 
