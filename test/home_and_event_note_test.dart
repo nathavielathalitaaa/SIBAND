@@ -17,7 +17,9 @@ void main() {
     return MaterialApp(
       home: MediaQuery(
         data: MediaQueryData(size: size),
-        child: child,
+        child: child is Scaffold || child is MainNavigationScreen
+            ? child
+            : Scaffold(backgroundColor: const Color(0xFFF6F4EF), body: child),
       ),
     );
   }
@@ -137,6 +139,8 @@ void main() {
       await tester.pump();
 
       expect(find.text('Notifikasi belum tersedia'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
     });
 
     testWidgets('Banner tap triggers navigation to Panduan', (tester) async {
@@ -214,6 +218,124 @@ void main() {
     });
   });
 
+  group('MainNavigationScreen with Anak Demo & Error States Tests', () {
+    final anakDemoChildren = [
+      ChildModel(id: 1, userId: 1, nickname: 'Anak Demo', birthYear: 2018),
+    ];
+
+    testWidgets('Layar utama dengan data tiruan Anak Demo memverifikasi nama anak, PEMANTAUAN DETAK JANTUNG, dan bar navigasi di 360x640', (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(buildTestable(
+        MainNavigationScreen(initialChildren: anakDemoChildren),
+        size: const Size(360, 640),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.textContaining('Anak Demo'), findsAtLeastNWidgets(1));
+      expect(find.text('PEMANTAUAN DETAK JANTUNG'), findsOneWidget);
+      expect(find.text('Beranda'), findsOneWidget);
+      expect(find.text('Panduan'), findsOneWidget);
+      expect(find.text('Rekap'), findsOneWidget);
+      expect(find.text('GPS'), findsOneWidget);
+      expect(find.text('Profil'), findsOneWidget);
+    });
+
+    testWidgets('Layar utama dengan data tiruan Anak Demo memverifikasi nama anak, PEMANTAUAN DETAK JANTUNG, dan bar navigasi di 412x915', (tester) async {
+      tester.view.physicalSize = const Size(412, 915);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(buildTestable(
+        MainNavigationScreen(initialChildren: anakDemoChildren),
+        size: const Size(412, 915),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.textContaining('Anak Demo'), findsAtLeastNWidgets(1));
+      expect(find.text('PEMANTAUAN DETAK JANTUNG'), findsOneWidget);
+      expect(find.text('Beranda'), findsOneWidget);
+      expect(find.text('Panduan'), findsOneWidget);
+      expect(find.text('Rekap'), findsOneWidget);
+      expect(find.text('GPS'), findsOneWidget);
+      expect(find.text('Profil'), findsOneWidget);
+    });
+
+    testWidgets('Layar utama dalam kondisi error menampilkan pesan error dan tombol Coba lagi di 360x640', (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(buildTestable(
+        const MainNavigationScreen(
+          initialErrorMessage: 'Gagal memuat data anak. Periksa koneksi internet Anda.',
+        ),
+        size: const Size(360, 640),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Terjadi kesalahan'), findsOneWidget);
+      expect(find.text('Gagal memuat data anak. Periksa koneksi internet Anda.'), findsOneWidget);
+      expect(find.widgetWithText(ElevatedButton, 'Coba lagi'), findsOneWidget);
+      expect(find.text('Beranda'), findsOneWidget);
+      expect(find.text('Panduan'), findsOneWidget);
+      expect(find.text('Rekap'), findsOneWidget);
+      expect(find.text('GPS'), findsOneWidget);
+      expect(find.text('Profil'), findsOneWidget);
+    });
+
+    testWidgets('Layar utama dalam kondisi error menampilkan pesan error dan tombol Coba lagi di 412x915', (tester) async {
+      tester.view.physicalSize = const Size(412, 915);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(buildTestable(
+        const MainNavigationScreen(
+          initialErrorMessage: 'Gagal memuat data anak. Periksa koneksi internet Anda.',
+        ),
+        size: const Size(412, 915),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Terjadi kesalahan'), findsOneWidget);
+      expect(find.text('Gagal memuat data anak. Periksa koneksi internet Anda.'), findsOneWidget);
+      expect(find.widgetWithText(ElevatedButton, 'Coba lagi'), findsOneWidget);
+      expect(find.text('Beranda'), findsOneWidget);
+      expect(find.text('Profil'), findsOneWidget);
+    });
+
+    testWidgets('Tombol Coba lagi pada kondisi error memicu reload data anak hingga berhasil', (tester) async {
+      bool retried = false;
+      await tester.pumpWidget(buildTestable(
+        MainNavigationScreen(
+          initialErrorMessage: 'Koneksi terputus',
+          onFetchChildren: () async {
+            retried = true;
+            return anakDemoChildren;
+          },
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Terjadi kesalahan'), findsOneWidget);
+      expect(find.widgetWithText(ElevatedButton, 'Coba lagi'), findsOneWidget);
+
+      final retryBtn = tester.widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Coba lagi'));
+      retryBtn.onPressed?.call();
+      await tester.pumpAndSettle();
+
+      expect(retried, isTrue);
+      expect(find.textContaining('Anak Demo'), findsAtLeastNWidgets(1));
+      expect(find.text('PEMANTAUAN DETAK JANTUNG'), findsOneWidget);
+    });
+  });
+
   group('ProfileScreen Tests', () {
     testWidgets('Renders ProfileScreen options', (tester) async {
       await tester.pumpWidget(buildTestable(const ProfileScreen()));
@@ -227,3 +349,4 @@ void main() {
     });
   });
 }
+
