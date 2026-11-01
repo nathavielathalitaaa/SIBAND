@@ -40,6 +40,48 @@ class EventNoteTest extends TestCase
             ->assertJsonFragment(['type' => 'transisi', 'note' => 'Test note']);
     }
 
+    public function test_user_can_create_event_note_with_perubahan_aktivitas_type()
+    {
+        $user = User::factory()->create();
+        $child = Child::factory()->create(['user_id' => $user->id]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/children/{$child->id}/event-notes", [
+                'type' => 'perubahan_aktivitas',
+                'note' => 'Catatan perubahan aktivitas',
+            ])
+            ->assertCreated()
+            ->assertJsonFragment(['type' => 'perubahan_aktivitas', 'note' => 'Catatan perubahan aktivitas']);
+    }
+
+    public function test_user_can_create_event_note_with_aktivitas_sulit_type()
+    {
+        $user = User::factory()->create();
+        $child = Child::factory()->create(['user_id' => $user->id]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/children/{$child->id}/event-notes", [
+                'type' => 'aktivitas_sulit',
+                'note' => 'Catatan aktivitas sulit',
+            ])
+            ->assertCreated()
+            ->assertJsonFragment(['type' => 'aktivitas_sulit', 'note' => 'Catatan aktivitas sulit']);
+    }
+
+    public function test_user_can_create_event_note_with_interaksi_sosial_type()
+    {
+        $user = User::factory()->create();
+        $child = Child::factory()->create(['user_id' => $user->id]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson("/api/children/{$child->id}/event-notes", [
+                'type' => 'interaksi_sosial',
+                'note' => 'Catatan interaksi sosial',
+            ])
+            ->assertCreated()
+            ->assertJsonFragment(['type' => 'interaksi_sosial', 'note' => 'Catatan interaksi sosial']);
+    }
+
     public function test_validation_fails_for_invalid_type()
     {
         $user = User::factory()->create();
