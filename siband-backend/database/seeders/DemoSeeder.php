@@ -52,5 +52,26 @@ class DemoSeeder extends Seeder
         \App\Models\EventNote::factory()->count(5)->create([
             'child_id' => $child->id,
         ]);
+
+        // Share links demo (only hashes stored, without original token in database)
+        \App\Models\ShareLink::create([
+            'child_id' => $child->id,
+            'token_hash' => hash('sha256', 'demo_active_share_link'),
+            'expires_at' => now()->addDays(7),
+            'last_accessed_at' => now()->subHours(2),
+        ]);
+
+        \App\Models\ShareLink::create([
+            'child_id' => $child->id,
+            'token_hash' => hash('sha256', 'demo_expired_share_link'),
+            'expires_at' => now()->subDays(2),
+        ]);
+
+        \App\Models\ShareLink::create([
+            'child_id' => $child->id,
+            'token_hash' => hash('sha256', 'demo_revoked_share_link'),
+            'expires_at' => now()->addDays(5),
+            'revoked_at' => now()->subDay(),
+        ]);
     }
 }

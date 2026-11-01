@@ -1,7 +1,10 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ConfigService {
-  static const String defaultBaseUrl = 'http://10.0.2.2:8000/api';
+  static const String defaultBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://127.0.0.1:8000/api',
+  );
   static const String apiBaseUrlKey = 'api_base_url';
 
   Future<String> getBaseUrl() async {
