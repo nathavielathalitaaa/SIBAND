@@ -89,16 +89,35 @@ Ditempatkan di folder `siband-backend/`:
 
 | Fitur / Komponen | Status | Keterangan |
 | :--- | :---: | :--- |
-| **BLE Discovery & Bonded Device Picker** | ✅ Selesai | Memilih smartwatch dari daftar paired Bluetooth HP. |
-| **GATT 0x2A37 HR Parsing & Stream** | ✅ Selesai | Parsing Uint8/Uint16 spec-compliant & single listener. |
-| **0xFEEA Continuous HR Trigger & Teardown** | ✅ Selesai | Memulai & menghentikan pengukuran otomatis pada jam. |
-| **3-State Sensor Status UI** | ✅ Selesai | Indikator `Measuring`, `Resting (Duty Cycle)`, `Disconnected`. |
-| **Real-time Charting (`fl_chart`)** | ✅ Selesai | Grafis LineChart ter-update otomatis via `setState()`. |
-| **REST API Ingestion & SQLite Storage** | ✅ Selesai | Data tersimpan otomatis di SQLite backend (`heart_rate_logs`). |
-| **Autentikasi User (Laravel Sanctum)** | ⏳ Planned | Package Sanctum terpasang, siap dihubungkan ke UI Login. |
-| **Manajemen Profil Anak** | ⏳ Planned | CRUD data anak/pengguna. |
-| **Statistik & Riwayat Panjang** | ⏳ Planned | Tampilan agregasi riwayat BPM mingguan/bulanan. |
-| **Rekomendasi Lullaby/Musik** | 🚫 Deferred | Cukup dibahas pada bab pengembangan laporan (bukan fitur wajib). |
+| **Welcome / Login / Register** | ✅ Selesai | Layar awal, autentikasi masuk, dan pendaftaran akun orang tua. |
+| **Autentikasi** | ✅ Selesai | Manajemen sesi auth & token berbasis Laravel Sanctum. |
+| **Profil Anak** | ✅ Selesai | Kelola data profil anak, tambah, edit, dan switch profil aktif. |
+| **Pairing Jam (Backend + Layar Flutter)** | ✅ Selesai | Pencarian BLE, pemilihan perangkat terikat, sinkron MAC ke backend. |
+| **Baseline** | ✅ Selesai | Perhitungan nilai dasar BPM (median, p25, p75) berbasis riwayat bacaan. |
+| **Catatan Kejadian** | ✅ Selesai | Pencatatan kejadian/pemicu dengan tipe terstandar dan catatan detail. |
+| **Rekap Bulanan** | ✅ Selesai | Ringkasan agregasi bulanan, rata-rata, maksimum BPM, dan grafik harian. |
+| **Tautan Terapis (Backend + Halaman Web)** | ✅ Selesai | Pembuatan token share link dan web statis `share.html` baca-saja. |
+| **Panduan** | ✅ Selesai (konten statis) | Layar panduan relaksasi, tips penanganan, dan edukasi terapis. |
+| **Tab GPS** | 🟡 Placeholder | Halaman penampung integrasi lokasi anak untuk fase berikutnya. |
+| **Alert / Notifikasi** | ⏳ Belum | Sistem peringatan dini saat BPM melewati ambang batas tertentu. |
+| **Sinkron Riwayat dari Jam** | ⏳ Belum | Penarikan data riwayat offline/buffer internal smartwatch. |
+| **Uji BLE di HP** | ⏳ Belum | Pengujian komprehensif end-to-end langsung pada perangkat fisik. |
+
+---
+
+## 🌐 Pengecualian Aturan UI
+
+Satu-satunya halaman web di sisi server adalah `siband-backend/public/share.html`, halaman statis baca-saja untuk terapis (tanpa Blade, tanpa framework) yang memanggil `GET /api/share/{token}`. Semua UI aplikasi tetap 100% Flutter; Laravel tetap Headless REST API.
+
+---
+
+## ⚠️ Kendala Teknis & Karakteristik Hardware
+
+* **Jeda Sensor Alami (Duty-Cycle ±5 Menit)**:
+  Sensor Heart Rate pada Infinix XWatch H4 memiliki pola hemat daya alami dari firmware pabrik: jam membaca BPM selama ~10-15 kali pembacaan kontinyu, lalu istirahat sejenak (**pause/resting ~5 menit**), kemudian melanjutkan membaca kembali secara otomatis.
+  > ⚠️ **PENTING**: Ini adalah perilaku normal bawaan firmware smartwatch, bukan koneksi putus atau error. Dilarang menambahkan timer re-trigger periodik.
+* **Koneksi Jaringan Lokal HP Fisik**:
+  Saat pengujian pada HP fisik melalui kabel data USB, koneksi API membutuhkan port forwarding `adb reverse tcp:8000 tcp:8000` agar `http://127.0.0.1:8000/api` dapat menjangkau server Laravel di komputer host.
 
 ---
 
@@ -150,7 +169,9 @@ Jika Anda adalah **AI Agent** atau **Developer baru** yang melanjutkan proyek in
 3. **STRATEGI REALTIME**:
    Proyek ini menggunakan **REST API (POST & GET)** dengan polling/pull-to-refresh. Jangan mencoba mengimplementasikan Server-Sent Events (SSE) atau WebSocket kecuali diminta secara eksplisit.
 4. **PEMISAHAN UI (DART/FLUTTER) VS BACKEND (LARAVEL REST API)**:
-   - **UI 100% Flutter (Dart)**: Seluruh tampilan antarmuka (Dashboard, Grafik, Device Picker Modal, Status Sensor, Form Auth/Profil) **WAJIB HANYA** dibuat di Flutter menggunakan bahasa **Dart** (`lib/`).
-   - **Laravel 100% Headless REST API (PHP)**: Laravel (`siband-backend/`) **HANYA** berfungsi sebagai Headless REST API yang mengembalikan response JSON dan mengelola database SQLite. **DILARANG MEMBUAT TAMPILAN UI ATAU TEMPLATE BLADE DI LARAVEL** untuk kebutuhan aplikasi mobile ini.
+   - **UI 100% Flutter (Dart)**: Seluruh tampilan antarmuka (Dashboard, Grafik, Device Picker Modal, Status Sensor, Form Auth/Profil, Rekap, Panduan) **WAJIB HANYA** dibuat di Flutter menggunakan bahasa **Dart** (`lib/`).
+   - **Laravel 100% Headless REST API (PHP)**: Laravel (`siband-backend/`) **HANYA** berfungsi sebagai Headless REST API yang mengembalikan response JSON dan mengelola database SQLite. Dilarang membuat template Blade di Laravel untuk kebutuhan aplikasi mobile ini.
+   - **Pengecualian aturan UI**: Satu-satunya halaman web di sisi server adalah `siband-backend/public/share.html`, halaman statis baca-saja untuk terapis (tanpa Blade, tanpa framework) yang memanggil `GET /api/share/{token}`. Semua UI aplikasi tetap 100% Flutter; Laravel tetap Headless REST API.
 5. **PEMELIHARAAN KODE**:
    Pastikan setiap kali melakukan perubahan, jalankan `flutter analyze` dan pastikan hasil analisis tetap **No issues found! (0 errors, 0 warnings)**.
+
