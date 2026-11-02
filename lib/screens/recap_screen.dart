@@ -13,6 +13,7 @@ class RecapScreen extends StatefulWidget {
   final Map<String, dynamic>? initialRecapData;
   final List<Map<String, dynamic>>? initialShareLinks;
   final int? activeChildId;
+  final ApiService? apiService;
 
   const RecapScreen({
     super.key,
@@ -20,6 +21,7 @@ class RecapScreen extends StatefulWidget {
     this.initialRecapData,
     this.initialShareLinks,
     this.activeChildId,
+    this.apiService,
   });
 
   @override
@@ -27,7 +29,7 @@ class RecapScreen extends StatefulWidget {
 }
 
 class _RecapScreenState extends State<RecapScreen> {
-  final ApiService _apiService = ApiService();
+  late final ApiService _apiService;
   final AuthService _authService = AuthService();
 
   bool _isLoading = true;
@@ -47,6 +49,7 @@ class _RecapScreenState extends State<RecapScreen> {
   @override
   void initState() {
     super.initState();
+    _apiService = widget.apiService ?? ApiService();
     final now = DateTime.now();
     _selectedMonth = DateTime(now.year, now.month);
 
@@ -520,7 +523,7 @@ class _RecapScreenState extends State<RecapScreen> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'Tautan ini hanya ditampilkan sekali. Simpan sekarang.',
+                              'Tautan ini hanya ditampilkan sekali. Simpan sekarang. Tautan hanya bisa dibuka bila server dapat dijangkau penerima.',
                               style: GoogleFonts.inter(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w500,
