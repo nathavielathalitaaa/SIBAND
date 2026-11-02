@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+  <title>Rekap untuk Terapis - Siband</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: #F6F4EF;
+      color: #1E2A24;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.5;
+      padding: 24px 16px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .container {
+      width: 100%;
+      max-width: 600px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 500;
+      background-color: #E3EEDF;
+      color: #1F5C4A;
+      margin-bottom: 8px;
+    }
+    .header {
+      margin-bottom: 20px;
+    }
+    .header h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: #1E2A24;
+      line-height: 1.2;
+      margin-bottom: 4px;
+    }
+    .header-sub {
+      font-size: 15px;
+      color: #6F7B74;
+    }
+    .card {
+      background: #FFFFFF;
+      border-radius: 16px;
+      border: 1px solid #D9DED6;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1E2A24;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    .stat-box {
+      background: #F9FAF8;
+      border: 1px solid #E5E9E2;
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: #6F7B74;
+      margin-bottom: 4px;
+    }
+    .stat-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1F5C4A;
+    }
+    .baseline-badge {
+      display: inline-block;
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: #E3EEDF;
+      color: #1F5C4A;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .baseline-insufficient {
+      display: inline-block;
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: #F3F4F6;
+      color: #6F7B74;
+      font-size: 13px;
+    }
+    .chart-container {
+      width: 100%;
+      overflow-x: auto;
+      padding-top: 8px;
+    }
+    .chart-legend {
+      display: flex;
+      gap: 16px;
+      margin-top: 12px;
+      font-size: 12px;
+      color: #6F7B74;
+      flex-wrap: wrap;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .legend-color {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+    }
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .type-tag {
+      padding: 4px 10px;
+      border-radius: 8px;
+      background: #F0F4EF;
+      color: #1F5C4A;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .event-item {
+      padding: 12px;
+      border-radius: 10px;
+      background: #F9FAF8;
+      border: 1px solid #E5E9E2;
+      margin-bottom: 8px;
+    }
+    .event-item:last-child {
+      margin-bottom: 0;
+    }
+    .event-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    .event-type {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1E2A24;
+    }
+    .event-time {
+      font-size: 11px;
+      color: #6F7B74;
+    }
+    .event-note {
+      font-size: 12px;
+      color: #4B5563;
+    }
+    .empty-text {
+      font-size: 13px;
+      color: #6F7B74;
+      font-style: italic;
+      text-align: center;
+      padding: 16px 0;
+    }
+    .footer-note {
+      font-size: 11px;
+      color: #6F7B74;
+      text-align: center;
+      line-height: 1.5;
+      margin-top: 8px;
+      padding: 12px 16px;
+    }
+    .state-message {
+      padding: 48px 16px;
+      text-align: center;
+    }
+    .state-icon {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 16px;
+      display: inline-block;
+    }
+    .state-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1E2A24;
+      margin-bottom: 8px;
+    }
+    .spinner {
+      border: 3px solid #E3EEDF;
+      border-top: 3px solid #1F5C4A;
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="app">
+    <div class="card state-message" id="loading-card">
+      <div class="spinner"></div>
+      <div class="state-title">Memuat data rekap...</div>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      var app = document.getElementById('app');
+
+      // 1. Baca token dari location.hash (bagian setelah #), BUKAN dari path atau query
+      var rawHash = window.location.hash || '';
+      var token = rawHash.indexOf('#') === 0 ? rawHash.substring(1) : rawHash;
+
+      // 2. Segera hapus hash dari address bar setelah dibaca (history.replaceState)
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+
+      function showErrorState() {
+        while (app.firstChild) {
+          app.removeChild(app.firstChild);
+        }
+        var errorCard = document.createElement('div');
+        errorCard.className = 'card state-message';
+
+        var title = document.createElement('div');
+        title.className = 'state-title';
+        title.textContent = 'Tautan tidak ditemukan atau sudah tidak berlaku.';
+        errorCard.appendChild(title);
+
+        app.appendChild(errorCard);
+      }
+
+      // Validasi token ada dan tidak kosong
+      if (!token || token.trim().length === 0) {
+        showErrorState();
+        return;
+      }
+
+      // 3. Fetch GET ke "/api/share/" + token
+      fetch('/api/share/' + encodeURIComponent(token.trim()), {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        }
+      })
+      .then(function(res) {
+        if (!res.ok) {
+          throw new Error('HTTP ' + res.status);
+        }
+        return res.json();
+      })
+      .then(function(data) {
+        renderPage(data);
+      })
+      .catch(function() {
+        showErrorState();
+      });
+
+      var typeNameMap = {
+        'suara_keras': 'Suara keras',
+        'perubahan_aktivitas': 'Perubahan aktivitas',
+        'transisi': 'Transisi kegiatan',
+        'aktivitas_sulit': 'Aktivitas sulit',
+        'interaksi_sosial': 'Interaksi sosial',
+        'lainnya': 'Lainnya',
+        'meltdown': 'Meltdown',
+        'aktivitas_fisik': 'Aktivitas fisik'
+      };
+
+      function formatIndonesianDate(isoString) {
+        if (!isoString) return '-';
+        try {
+          var d = new Date(isoString);
+          if (isNaN(d.getTime())) return isoString;
+          var pad = function(n) { return n < 10 ? '0' + n : n; };
+          return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+        } catch (_) {
+          return isoString;
+        }
+      }
+
+      function formatMonthPeriod(periodStr) {
+        if (!periodStr) return '';
+        var parts = periodStr.split('-');
+        if (parts.length === 2) {
+          var monthNames = [
+            'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+            'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+          ];
+          var monthIdx = parseInt(parts[1], 10) - 1;
+          if (monthIdx >= 0 && monthIdx < 12) {
+            return monthNames[monthIdx] + ' ' + parts[0];
+          }
+        }
+        return periodStr;
+      }
+
+      function renderPage(payload) {
+        while (app.firstChild) {
+          app.removeChild(app.firstChild);
+        }
+
+        var nickname = payload.nickname || 'Anak';
+        var periode = payload.periode || '';
+        var rekap = payload.rekap || {};
+        var baseline = rekap.baseline || {};
+        var ringkasanPerHari = rekap.ringkasan_per_hari || [];
+        var catatanKejadian = rekap.catatan_kejadian || {};
+        var catatanDaftar = catatanKejadian.daftar || rekap.daftar_catatan || [];
+        var catatanPerTipe = catatanKejadian.per_tipe || rekap.catatan_per_tipe || {};
+
+        var isBaselineSufficient = Boolean(baseline && baseline.sufficient);
+
+        // Header Section
+        var header = document.createElement('div');
+        header.className = 'header';
+
+        var badge = document.createElement('div');
+        badge.className = 'badge';
+        badge.textContent = 'Tautan baca-saja. Data bersifat pribadi.';
+        header.appendChild(badge);
+
+        var h1 = document.createElement('h1');
+        h1.textContent = 'Rekap untuk terapis';
+        header.appendChild(h1);
+
+        var sub = document.createElement('div');
+        sub.className = 'header-sub';
+        sub.textContent = nickname + (periode ? ' \u2022 Periode ' + formatMonthPeriod(periode) : '');
+        header.appendChild(sub);
+
+        app.appendChild(header);
+
+        // Card 1: Ringkasan
+        var summaryCard = document.createElement('div');
+        summaryCard.className = 'card';
+
+        var summaryTitle = document.createElement('div');
+        summaryTitle.className = 'card-title';
+        summaryTitle.textContent = 'Ringkasan Aktivitas';
+        summaryCard.appendChild(summaryTitle);
+
+        var grid = document.createElement('div');
+        grid.className = 'stats-grid';
+
+        function createStatBox(label, value) {
+          var box = document.createElement('div');
+          box.className = 'stat-box';
+          var lbl = document.createElement('div');
+          lbl.className = 'stat-label';
+          lbl.textContent = label;
+          var val = document.createElement('div');
+          val.className = 'stat-value';
+          val.textContent = value;
+          box.appendChild(lbl);
+          box.appendChild(val);
+          return box;
+        }
+
+        grid.appendChild(createStatBox('Rata-rata BPM', rekap.rata_rata != null ? rekap.rata_rata + ' BPM' : '-'));
+        grid.appendChild(createStatBox('Maksimum BPM', rekap.maksimum != null ? rekap.maksimum + ' BPM' : '-'));
+        grid.appendChild(createStatBox('Jumlah Bacaan', (rekap.jumlah_sampel != null ? rekap.jumlah_sampel : 0) + ' sampel'));
+        grid.appendChild(createStatBox('Hari Tersinkron', (rekap.jumlah_hari != null ? rekap.jumlah_hari : 0) + ' hari'));
+
+        summaryCard.appendChild(grid);
+        app.appendChild(summaryCard);
+
+        // Card 2: Baseline
+        var baselineCard = document.createElement('div');
+        baselineCard.className = 'card';
+
+        var baselineTitle = document.createElement('div');
+        baselineTitle.className = 'card-title';
+        baselineTitle.textContent = 'Baseline Detak Jantung';
+        baselineCard.appendChild(baselineTitle);
+
+        if (isBaselineSufficient) {
+          var bGrid = document.createElement('div');
+          bGrid.className = 'stats-grid';
+          bGrid.appendChild(createStatBox('P25 (Batas Bawah)', baseline.p25 != null ? baseline.p25 + ' BPM' : '-'));
+          bGrid.appendChild(createStatBox('Median (Tipikal)', baseline.median != null ? baseline.median + ' BPM' : '-'));
+          bGrid.appendChild(createStatBox('P75 (Batas Atas)', baseline.p75 != null ? baseline.p75 + ' BPM' : '-'));
+          bGrid.appendChild(createStatBox('Masa Analisis', (baseline.days_used || 30) + ' hari'));
+          baselineCard.appendChild(bGrid);
+        } else {
+          var noBase = document.createElement('div');
+          noBase.className = 'baseline-insufficient';
+          noBase.textContent = 'Baseline belum cukup data';
+          baselineCard.appendChild(noBase);
+        }
+        app.appendChild(baselineCard);
+
+        // Card 3: Grafik Batang per Hari
+        var chartCard = document.createElement('div');
+        chartCard.className = 'card';
+
+        var chartTitle = document.createElement('div');
+        chartTitle.className = 'card-title';
+        chartTitle.textContent = 'Tren Detak Jantung Harian';
+        chartCard.appendChild(chartTitle);
+
+        if (ringkasanPerHari.length === 0) {
+          var emptyChart = document.createElement('div');
+          emptyChart.className = 'empty-text';
+          emptyChart.textContent = 'Belum ada data';
+          chartCard.appendChild(emptyChart);
+        } else {
+          var chartWrapper = document.createElement('div');
+          chartWrapper.className = 'chart-container';
+
+          var svgNS = 'http://www.w3.org/2000/svg';
+          var svgWidth = Math.max(340, ringkasanPerHari.length * 36 + 40);
+          var svgHeight = 160;
+          var padLeft = 32;
+          var padBottom = 28;
+          var padTop = 20;
+          var usableHeight = svgHeight - padTop - padBottom;
+
+          var maxVal = 140;
+          for (var i = 0; i < ringkasanPerHari.length; i++) {
+            var itemVal = ringkasanPerHari[i].rata_rata || 0;
+            if (itemVal > maxVal) maxVal = itemVal + 10;
+          }
+
+          var svg = document.createElementNS(svgNS, 'svg');
+          svg.setAttribute('viewBox', '0 0 ' + svgWidth + ' ' + svgHeight);
+          svg.setAttribute('width', svgWidth.toString());
+          svg.setAttribute('height', svgHeight.toString());
+          svg.style.display = 'block';
+
+          // Base horizontal axis
+          var axisLine = document.createElementNS(svgNS, 'line');
+          axisLine.setAttribute('x1', padLeft.toString());
+          axisLine.setAttribute('y1', (svgHeight - padBottom).toString());
+          axisLine.setAttribute('x2', svgWidth.toString());
+          axisLine.setAttribute('y2', (svgHeight - padBottom).toString());
+          axisLine.setAttribute('stroke', '#D9DED6');
+          axisLine.setAttribute('stroke-width', '1');
+          svg.appendChild(axisLine);
+
+          var barWidth = 18;
+          var step = (svgWidth - padLeft - 10) / ringkasanPerHari.length;
+
+          for (var d = 0; d < ringkasanPerHari.length; d++) {
+            var dayData = ringkasanPerHari[d];
+            var dayAvg = dayData.rata_rata || 0;
+            var dayAbove = dayData.bacaan_di_atas_p75 || 0;
+            var isAlertDay = isBaselineSufficient && dayAbove > 0;
+
+            var barH = Math.max(4, (dayAvg / maxVal) * usableHeight);
+            var xPos = padLeft + d * step + (step - barWidth) / 2;
+            var yPos = (svgHeight - padBottom) - barH;
+
+            var bar = document.createElementNS(svgNS, 'rect');
+            bar.setAttribute('x', xPos.toFixed(1));
+            bar.setAttribute('y', yPos.toFixed(1));
+            bar.setAttribute('width', barWidth.toString());
+            bar.setAttribute('height', barH.toFixed(1));
+            bar.setAttribute('rx', '4');
+            bar.setAttribute('fill', isAlertDay ? '#E8A24F' : '#1F5C4A');
+            svg.appendChild(bar);
+
+            // BPM label on top of bar
+            var valTxt = document.createElementNS(svgNS, 'text');
+            valTxt.setAttribute('x', (xPos + barWidth / 2).toFixed(1));
+            valTxt.setAttribute('y', Math.max(12, yPos - 4).toFixed(1));
+            valTxt.setAttribute('text-anchor', 'middle');
+            valTxt.setAttribute('font-size', '9');
+            valTxt.setAttribute('fill', '#1E2A24');
+            valTxt.textContent = Math.round(dayAvg).toString();
+            svg.appendChild(valTxt);
+
+            // Date label below axis
+            var dateLabel = dayData.tanggal ? dayData.tanggal.split('-').pop() : (d + 1).toString();
+            var dTxt = document.createElementNS(svgNS, 'text');
+            dTxt.setAttribute('x', (xPos + barWidth / 2).toFixed(1));
+            dTxt.setAttribute('y', (svgHeight - 10).toString());
+            dTxt.setAttribute('text-anchor', 'middle');
+            dTxt.setAttribute('font-size', '10');
+            dTxt.setAttribute('fill', '#6F7B74');
+            dTxt.textContent = dateLabel;
+            svg.appendChild(dTxt);
+          }
+
+          chartWrapper.appendChild(svg);
+          chartCard.appendChild(chartWrapper);
+
+          // Legend
+          var legend = document.createElement('div');
+          legend.className = 'chart-legend';
+
+          var leg1 = document.createElement('div');
+          leg1.className = 'legend-item';
+          var color1 = document.createElement('div');
+          color1.className = 'legend-color';
+          color1.style.background = '#1F5C4A';
+          var text1 = document.createElement('span');
+          text1.textContent = 'Rata-rata normal';
+          leg1.appendChild(color1);
+          leg1.appendChild(text1);
+          legend.appendChild(leg1);
+
+          var leg2 = document.createElement('div');
+          leg2.className = 'legend-item';
+          var color2 = document.createElement('div');
+          color2.className = 'legend-color';
+          color2.style.background = '#E8A24F';
+          var text2 = document.createElement('span');
+          text2.textContent = 'Ada bacaan di atas P75';
+          leg2.appendChild(color2);
+          leg2.appendChild(text2);
+          legend.appendChild(leg2);
+
+          chartCard.appendChild(legend);
+        }
+        app.appendChild(chartCard);
+
+        // Card 4: Catatan Kejadian
+        var notesCard = document.createElement('div');
+        notesCard.className = 'card';
+
+        var notesTitle = document.createElement('div');
+        notesTitle.className = 'card-title';
+        notesTitle.textContent = 'Catatan Kejadian';
+        notesCard.appendChild(notesTitle);
+
+        var typeKeys = Object.keys(catatanPerTipe);
+        if (typeKeys.length > 0) {
+          var tagList = document.createElement('div');
+          tagList.className = 'tag-list';
+          for (var t = 0; t < typeKeys.length; t++) {
+            var k = typeKeys[t];
+            var count = catatanPerTipe[k];
+            var tag = document.createElement('div');
+            tag.className = 'type-tag';
+            tag.textContent = (typeNameMap[k] || k) + ': ' + count;
+            tagList.appendChild(tag);
+          }
+          notesCard.appendChild(tagList);
+        }
+
+        if (catatanDaftar.length === 0) {
+          var emptyNotes = document.createElement('div');
+          emptyNotes.className = 'empty-text';
+          emptyNotes.textContent = 'Belum ada catatan kejadian';
+          notesCard.appendChild(emptyNotes);
+        } else {
+          for (var n = 0; n < catatanDaftar.length; n++) {
+            var ev = catatanDaftar[n];
+            var evItem = document.createElement('div');
+            evItem.className = 'event-item';
+
+            var evHeader = document.createElement('div');
+            evHeader.className = 'event-header';
+
+            var evType = document.createElement('div');
+            evType.className = 'event-type';
+            evType.textContent = typeNameMap[ev.tipe] || ev.tipe || 'Kejadian';
+            evHeader.appendChild(evType);
+
+            var evTime = document.createElement('div');
+            evTime.className = 'event-time';
+            evTime.textContent = formatIndonesianDate(ev.waktu);
+            evHeader.appendChild(evTime);
+
+            evItem.appendChild(evHeader);
+
+            var evNote = document.createElement('div');
+            evNote.className = 'event-note';
+            evNote.textContent = ev.catatan || 'Tanpa catatan tambahan';
+            evItem.appendChild(evNote);
+
+            notesCard.appendChild(evItem);
+          }
+        }
+        app.appendChild(notesCard);
+
+        // Footer Card: Catatan Kaki Wajib
+        var footer = document.createElement('div');
+        footer.className = 'footer-note';
+        footer.textContent = 'Detak jantung dari jam tangan konsumen; perubahan detak jantung bukan bukti stres dan bukan diagnosis. Data ini pelengkap observasi, bukan pengganti penilaian profesional.';
+        app.appendChild(footer);
+      }
+    })();
+  </script>
+</body>
+</html>
