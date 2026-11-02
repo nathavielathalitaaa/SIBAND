@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 import 'ble_service.dart';
 
@@ -12,7 +13,9 @@ enum HrSensorStatus { measuring, resting, disconnected }
 class HeartRateService extends ChangeNotifier {
   static final HeartRateService instance = HeartRateService._internal();
 
-  HeartRateService._internal();
+  HeartRateService._internal() {
+    unawaited(loadSavedDevice());
+  }
 
   final ApiService _apiService = ApiService();
   final BleService _bleService = BleService();
@@ -53,14 +56,50 @@ class HeartRateService extends ChangeNotifier {
   int? _activeDeviceId;
   int? get activeDeviceId => _activeDeviceId;
 
+  String? _pairedDeviceName;
+  String? get pairedDeviceName => _pairedDeviceName;
+
   bool _isStarted = false;
 
   void setActiveChild(int? childId) {
     _activeChildId = childId;
+    notifyListeners();
   }
 
   void setActiveDevice(int? deviceId) {
     _activeDeviceId = deviceId;
+    notifyListeners();
+  }
+
+  Future<void> setPairedDevice({required int deviceId, required String deviceName}) async {
+    _activeDeviceId = deviceId;
+    _pairedDeviceName = deviceName;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('active_device_id', deviceId);
+      await prefs.setString('active_device_name', deviceName);
+    } catch (_) {}
+  }
+
+  Future<void> loadSavedDevice() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _activeDeviceId = prefs.getInt('active_device_id');
+      _pairedDeviceName = prefs.getString('active_device_name');
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<void> clearPairedDevice() async {
+    _activeDeviceId = null;
+    _pairedDeviceName = null;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('active_device_id');
+      await prefs.remove('active_device_name');
+    } catch (_) {}
   }
 
   HrSensorStatus get sensorStatus {

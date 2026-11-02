@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/child_model.dart';
@@ -6,8 +8,17 @@ import 'auth_service.dart';
 import 'config_service.dart';
 
 class ApiService {
-  final AuthService _authService = AuthService();
-  final ConfigService _configService = ConfigService();
+  final AuthService _authService;
+  final ConfigService _configService;
+  final http.Client _client;
+
+  ApiService({
+    AuthService? authService,
+    ConfigService? configService,
+    http.Client? client,
+  })  : _authService = authService ?? AuthService(),
+        _configService = configService ?? ConfigService(),
+        _client = client ?? http.Client();
 
   Future<bool> postHeartRate({
     required int bpm,
@@ -38,7 +49,7 @@ class ApiService {
         payload['device_id'] = deviceId;
       }
 
-      final response = await http.post(
+      final response = await _client.post(
         url,
         headers: {
           'Content-Type': 'application/json',
@@ -46,7 +57,7 @@ class ApiService {
           'Authorization': 'Bearer $token',
         },
         body: jsonEncode(payload),
-      );
+      ).timeout(const Duration(seconds: 15));
 
       return response.statusCode == 201;
     } catch (e) {
@@ -67,13 +78,13 @@ class ApiService {
       final url = Uri.parse('$baseUrl/heart-rate').replace(
         queryParameters: hours != null ? {'hours': '$hours'} : null,
       );
-      final response = await http.get(
+      final response = await _client.get(
         url,
         headers: {
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).timeout(const Duration(seconds: 15));
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data.cast<Map<String, dynamic>>();
@@ -93,13 +104,13 @@ class ApiService {
 
       final baseUrl = await _configService.getBaseUrl();
       final url = Uri.parse('$baseUrl/user');
-      final response = await http.get(
+      final response = await _client.get(
         url,
         headers: {
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
@@ -122,13 +133,13 @@ class ApiService {
 
       final baseUrl = await _configService.getBaseUrl();
       final url = Uri.parse('$baseUrl/children');
-      final response = await http.get(
+      final response = await _client.get(
         url,
         headers: {
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -136,7 +147,14 @@ class ApiService {
       } else {
         throw Exception('Server mengembalikan status ${response.statusCode}');
       }
+    } on TimeoutException {
+      throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
+    } on SocketException {
+      throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
     } catch (e) {
+      if (e is http.ClientException || e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
+        throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
+      }
       debugPrint('[ApiService] Error fetching children: $e');
       rethrow;
     }
@@ -153,7 +171,7 @@ class ApiService {
 
       final baseUrl = await _configService.getBaseUrl();
       final url = Uri.parse('$baseUrl/children');
-      final response = await http.post(
+      final response = await _client.post(
         url,
         headers: {
           'Content-Type': 'application/json',
@@ -164,7 +182,7 @@ class ApiService {
           'nickname': nickname,
           'birth_year': birthYear,
         }),
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -189,7 +207,7 @@ class ApiService {
 
       final baseUrl = await _configService.getBaseUrl();
       final url = Uri.parse('$baseUrl/children/$id');
-      final response = await http.put(
+      final response = await _client.put(
         url,
         headers: {
           'Content-Type': 'application/json',
@@ -200,7 +218,7 @@ class ApiService {
           'nickname': nickname,
           'birth_year': birthYear,
         }),
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -221,13 +239,13 @@ class ApiService {
 
       final baseUrl = await _configService.getBaseUrl();
       final url = Uri.parse('$baseUrl/children/$id');
-      final response = await http.delete(
+      final response = await _client.delete(
         url,
         headers: {
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).timeout(const Duration(seconds: 15));
 
       return response.statusCode == 200;
     } catch (e) {
@@ -244,13 +262,13 @@ class ApiService {
 
       final baseUrl = await _configService.getBaseUrl();
       final url = Uri.parse('$baseUrl/children/$childId/baseline?days=$days');
-      final response = await http.get(
+      final response = await _client.get(
         url,
         headers: {
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
@@ -283,7 +301,7 @@ class ApiService {
           '${time.year.toString().padLeft(4, '0')}-${time.month.toString().padLeft(2, '0')}-${time.day.toString().padLeft(2, '0')} '
           '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}:${time.second.toString().padLeft(2, '0')}';
 
-      final response = await http.post(
+      final response = await _client.post(
         url,
         headers: {
           'Content-Type': 'application/json',
@@ -295,7 +313,7 @@ class ApiService {
           if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
           'occurred_at': formattedTime,
         }),
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         return {'success': true, 'message': 'Catatan tersimpan'};
@@ -309,7 +327,23 @@ class ApiService {
         } catch (_) {}
         return {'success': false, 'message': msg};
       }
+    } on TimeoutException {
+      return {
+        'success': false,
+        'message': 'Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.',
+      };
+    } on SocketException {
+      return {
+        'success': false,
+        'message': 'Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.',
+      };
     } catch (e) {
+      if (e is http.ClientException || e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
+        return {
+          'success': false,
+          'message': 'Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.',
+        };
+      }
       debugPrint('[ApiService] Error creating event note: $e');
       return {'success': false, 'message': 'Gagal terhubung ke server: $e'};
     }
@@ -328,13 +362,13 @@ class ApiService {
         queryParameters: month != null ? {'month': month} : null,
       );
 
-      final response = await http.get(
+      final response = await _client.get(
         url,
         headers: {
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
@@ -342,7 +376,14 @@ class ApiService {
         throw Exception('Unauthenticated');
       }
       return null;
+    } on TimeoutException {
+      throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
+    } on SocketException {
+      throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
     } catch (e) {
+      if (e is http.ClientException || e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
+        throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
+      }
       debugPrint('[ApiService] Error fetching recap: $e');
       rethrow;
     }
@@ -359,13 +400,13 @@ class ApiService {
       final baseUrl = await _configService.getBaseUrl();
       final url = Uri.parse('$baseUrl/children/$childId/share-links');
 
-      final response = await http.get(
+      final response = await _client.get(
         url,
         headers: {
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -374,7 +415,14 @@ class ApiService {
         throw Exception('Unauthenticated');
       }
       return [];
+    } on TimeoutException {
+      throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
+    } on SocketException {
+      throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
     } catch (e) {
+      if (e is http.ClientException || e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
+        throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
+      }
       debugPrint('[ApiService] Error fetching share links: $e');
       rethrow;
     }
@@ -391,7 +439,7 @@ class ApiService {
       final baseUrl = await _configService.getBaseUrl();
       final url = Uri.parse('$baseUrl/children/$childId/share-links');
 
-      final response = await http.post(
+      final response = await _client.post(
         url,
         headers: {
           'Content-Type': 'application/json',
@@ -399,7 +447,7 @@ class ApiService {
           'Authorization': 'Bearer $token',
         },
         body: jsonEncode({'days': days}),
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         return jsonDecode(response.body) as Map<String, dynamic>;
@@ -407,7 +455,14 @@ class ApiService {
         throw Exception('Unauthenticated');
       }
       return null;
+    } on TimeoutException {
+      throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
+    } on SocketException {
+      throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
     } catch (e) {
+      if (e is http.ClientException || e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
+        throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
+      }
       debugPrint('[ApiService] Error creating share link: $e');
       rethrow;
     }
@@ -424,13 +479,13 @@ class ApiService {
       final baseUrl = await _configService.getBaseUrl();
       final url = Uri.parse('$baseUrl/share-links/$shareLinkId');
 
-      final response = await http.delete(
+      final response = await _client.delete(
         url,
         headers: {
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         return true;
@@ -438,10 +493,111 @@ class ApiService {
         throw Exception('Unauthenticated');
       }
       return false;
+    } on TimeoutException {
+      throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
+    } on SocketException {
+      throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
     } catch (e) {
+      if (e is http.ClientException || e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
+        throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
+      }
       debugPrint('[ApiService] Error deleting share link: $e');
       rethrow;
     }
   }
-}
 
+  /// Pasangkan device ke anak (POST /api/devices/pair).
+  Future<Map<String, dynamic>> pairDevice({
+    required String mac,
+    required String name,
+    required int childId,
+  }) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null || token.isEmpty) {
+        return {'success': false, 'message': 'Sesi telah berakhir, silakan login kembali.', 'statusCode': 401};
+      }
+
+      final baseUrl = await _configService.getBaseUrl();
+      final url = Uri.parse('$baseUrl/devices/pair');
+      final response = await _client.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'mac': mac,
+          'name': name,
+          'child_id': childId,
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return {'success': true, 'data': data, 'device': data, 'statusCode': response.statusCode};
+      } else if (response.statusCode == 401) {
+        return {'success': false, 'message': 'Unauthenticated', 'statusCode': 401};
+      } else {
+        String msg = 'Gagal memasangkan jam';
+        try {
+          final data = jsonDecode(response.body);
+          if (data is Map && data['message'] != null) {
+            msg = data['message'].toString();
+          }
+        } catch (_) {}
+        return {'success': false, 'message': msg, 'statusCode': response.statusCode};
+      }
+    } on TimeoutException {
+      return {
+        'success': false,
+        'message': 'Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.',
+      };
+    } on SocketException {
+      return {
+        'success': false,
+        'message': 'Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.',
+      };
+    } catch (e) {
+      if (e is http.ClientException || e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
+        return {
+          'success': false,
+          'message': 'Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.',
+        };
+      }
+      debugPrint('[ApiService] Error pairing device: $e');
+      return {
+        'success': false,
+        'message': 'Gagal terhubung ke server: $e',
+      };
+    }
+  }
+
+  /// Ambil daftar jam yang terpasang (GET /api/devices).
+  Future<List<Map<String, dynamic>>> getDevices() async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null || token.isEmpty) return [];
+
+      final baseUrl = await _configService.getBaseUrl();
+      final url = Uri.parse('$baseUrl/devices');
+      final response = await _client.get(
+        url,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('[ApiService] Error fetching devices: $e');
+      return [];
+    }
+  }
+}

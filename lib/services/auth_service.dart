@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,6 +9,9 @@ import 'config_service.dart';
 class AuthService {
   static const String tokenKey = 'access_token';
   final ConfigService _configService = ConfigService();
+  final http.Client _client;
+
+  AuthService({http.Client? client}) : _client = client ?? http.Client();
 
   /// Register user baru, simpan token jika berhasil.
   Future<Map<String, dynamic>> register({
@@ -18,7 +23,7 @@ class AuthService {
     try {
       final baseUrl = await _configService.getBaseUrl();
       final url = Uri.parse('$baseUrl/register');
-      final response = await http.post(
+      final response = await _client.post(
         url,
         headers: {
           'Content-Type': 'application/json',
@@ -30,7 +35,7 @@ class AuthService {
           'password': password,
           'password_confirmation': passwordConfirmation,
         }),
-      );
+      ).timeout(const Duration(seconds: 15));
 
       final Map<String, dynamic> data = jsonDecode(response.body);
 
@@ -52,7 +57,23 @@ class AuthService {
           'message': errorMessage,
         };
       }
+    } on TimeoutException {
+      return {
+        'success': false,
+        'message': 'Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.',
+      };
+    } on SocketException {
+      return {
+        'success': false,
+        'message': 'Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.',
+      };
     } catch (e) {
+      if (e is http.ClientException || e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
+        return {
+          'success': false,
+          'message': 'Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.',
+        };
+      }
       debugPrint('[AuthService] Error saat register: $e');
       return {
         'success': false,
@@ -69,7 +90,7 @@ class AuthService {
     try {
       final baseUrl = await _configService.getBaseUrl();
       final url = Uri.parse('$baseUrl/login');
-      final response = await http.post(
+      final response = await _client.post(
         url,
         headers: {
           'Content-Type': 'application/json',
@@ -79,7 +100,7 @@ class AuthService {
           'email': email,
           'password': password,
         }),
-      );
+      ).timeout(const Duration(seconds: 15));
 
       final Map<String, dynamic> data = jsonDecode(response.body);
 
@@ -101,7 +122,23 @@ class AuthService {
           'message': errorMessage,
         };
       }
+    } on TimeoutException {
+      return {
+        'success': false,
+        'message': 'Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.',
+      };
+    } on SocketException {
+      return {
+        'success': false,
+        'message': 'Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.',
+      };
     } catch (e) {
+      if (e is http.ClientException || e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
+        return {
+          'success': false,
+          'message': 'Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.',
+        };
+      }
       debugPrint('[AuthService] Error saat login: $e');
       return {
         'success': false,
@@ -117,13 +154,13 @@ class AuthService {
       if (token != null && token.isNotEmpty) {
         final baseUrl = await _configService.getBaseUrl();
         final url = Uri.parse('$baseUrl/logout');
-        await http.post(
+        await _client.post(
           url,
           headers: {
             'Accept': 'application/json',
             'Authorization': 'Bearer $token',
           },
-        );
+        ).timeout(const Duration(seconds: 15));
       }
     } catch (e) {
       debugPrint('[AuthService] Error saat logout di server: $e');
@@ -152,13 +189,13 @@ class AuthService {
     try {
       final baseUrl = await _configService.getBaseUrl();
       final url = Uri.parse('$baseUrl/user');
-      final response = await http.get(
+      final response = await _client.get(
         url,
         headers: {
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      ).timeout(const Duration(seconds: 5));
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 401) {
         // Token sudah revoke/expired di server, hapus token lokal
