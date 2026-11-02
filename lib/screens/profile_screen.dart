@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
-import '../services/ble_service.dart';
 import '../services/heart_rate_service.dart';
 import 'bpm_dashboard_screen.dart' hide Mode, HrSensorStatus;
 import 'manage_children_screen.dart';
 import 'onboarding_screen.dart';
+import 'pair_device_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback? onChildrenChanged;
@@ -24,7 +23,6 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final ApiService _apiService = ApiService();
   final AuthService _authService = AuthService();
-  final BleService _bleService = BleService();
   final HeartRateService _hrService = HeartRateService.instance;
 
   String _userName = 'Memuat...';
@@ -34,6 +32,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _fetchUserData();
+    _hrService.addListener(_onHrChanged);
+  }
+
+  void _onHrChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _hrService.removeListener(_onHrChanged);
+    super.dispose();
   }
 
   Future<void> _fetchUserData() async {
@@ -138,83 +147,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() {});
       }
     } else {
-      await _pickBleDeviceAndConnect();
-    }
-  }
-
-  Future<void> _pickBleDeviceAndConnect() async {
-    final devices = await _bleService.getBondedDevices();
-    if (!mounted) return;
-
-    if (devices.isEmpty) {
-      await showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text('Tidak Ada Perangkat', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-          content: Text(
-            'Tidak ada device Bluetooth yang terpasang. Pasangkan smartband dulu lewat Pengaturan Bluetooth HP.',
-            style: GoogleFonts.inter(fontSize: 14),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('OK'),
-            ),
-          ],
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const PairDeviceScreen(),
         ),
       );
-      return;
+      if (mounted) setState(() {});
     }
-
-    final chosenDevice = await showDialog<BluetoothDevice>(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text('Pilih Device Bluetooth', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: devices.length,
-              itemBuilder: (context, index) {
-                final d = devices[index];
-                final name = d.platformName.isNotEmpty ? d.platformName : 'Perangkat Tanpa Nama';
-                return ListTile(
-                  leading: const Icon(Icons.watch, color: Color(0xFF1F5C4A)),
-                  title: Text(name, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500)),
-                  subtitle: Text(d.remoteId.str, style: GoogleFonts.inter(fontSize: 12)),
-                  onTap: () => Navigator.pop(ctx, d),
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Batal'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (chosenDevice == null || !mounted) return;
-
-    await _hrService.connectToDevice(chosenDevice);
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Menghubungkan ke ${chosenDevice.platformName.isNotEmpty ? chosenDevice.platformName : chosenDevice.remoteId.str}...'),
-        backgroundColor: const Color(0xFF1F5C4A),
-      ),
-    );
-    setState(() {});
   }
+
 
   Future<void> _handleLogout() async {
     final confirmed = await showDialog<bool>(
@@ -404,6 +346,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF6F7B74)),
                     onTap: _handleDataSourceSelection,
+                  ),
+                  const Divider(height: 1, indent: 64, endIndent: 20),
+
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE3EEDF),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.watch_rounded, color: Color(0xFF1F5C4A), size: 20),
+                    ),
+                    title: Text(
+                      'Jam terpasang',
+                      style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500, color: const Color(0xFF1E2A24)),
+                    ),
+                    subtitle: Text(
+                      _hrService.pairedDeviceName != null
+                          ? _hrService.pairedDeviceName!
+                          : 'Belum ada jam terpasang',
+                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF6F7B74)),
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF6F7B74)),
+                    onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const PairDeviceScreen(),
+                        ),
+                      );
+                      if (mounted) setState(() {});
+                    },
                   ),
                   const Divider(height: 1, indent: 64, endIndent: 20),
 

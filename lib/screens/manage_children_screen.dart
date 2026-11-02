@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/child_model.dart';
 import '../services/api_service.dart';
+import 'pair_device_screen.dart';
 
 class ManageChildrenScreen extends StatefulWidget {
   final VoidCallback? onChildrenUpdated;
@@ -379,6 +380,21 @@ class _ManageChildrenScreenState extends State<ManageChildrenScreen> {
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
+                                IconButton(
+                                  icon: const Icon(Icons.watch_outlined, size: 20, color: Color(0xFF1F5C4A)),
+                                  tooltip: 'Pasang jam',
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => PairDeviceScreen(
+                                          childId: child.id,
+                                          childNickname: child.nickname,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
                                 IconButton(
                                   icon: const Icon(Icons.edit_outlined, size: 20),
                                   onPressed: () => _showAddOrEditDialog(childToEdit: child),
