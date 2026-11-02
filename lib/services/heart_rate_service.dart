@@ -85,8 +85,14 @@ class HeartRateService extends ChangeNotifier {
   Future<void> loadSavedDevice() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      _activeDeviceId = prefs.getInt('active_device_id');
-      _pairedDeviceName = prefs.getString('active_device_name');
+      final savedId = prefs.getInt('active_device_id');
+      final savedName = prefs.getString('active_device_name');
+      if (savedId != null) {
+        _activeDeviceId = savedId;
+      }
+      if (savedName != null) {
+        _pairedDeviceName = savedName;
+      }
       notifyListeners();
     } catch (_) {}
   }
