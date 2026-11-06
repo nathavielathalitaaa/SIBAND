@@ -51,3 +51,4 @@ app.*.map.json
 /android/app/release
 paas-git-week3/
 .aider*
+.aider*
