@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../models/child_model.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/heart_rate_service.dart';
@@ -25,13 +27,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final AuthService _authService = AuthService();
   final HeartRateService _hrService = HeartRateService.instance;
 
+  static const String activeChildIdKey = 'active_child_id';
+
   String _userName = 'Memuat...';
   String _userEmail = '';
+  ChildModel? _activeChild;
 
   @override
   void initState() {
     super.initState();
     _fetchUserData();
+    _fetchActiveChild();
     _hrService.addListener(_onHrChanged);
   }
 
@@ -43,6 +49,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void dispose() {
     _hrService.removeListener(_onHrChanged);
     super.dispose();
+  }
+
+  Future<void> _fetchActiveChild() async {
+    try {
+      final list = await _apiService.getChildren();
+      if (!mounted) return;
+      final prefs = await SharedPreferences.getInstance();
+      final savedChildId = prefs.getInt(activeChildIdKey);
+
+      ChildModel? selectedChild;
+      if (list.isNotEmpty) {
+        if (savedChildId != null) {
+          selectedChild = list.firstWhere(
+            (c) => c.id == savedChildId,
+            orElse: () => list.first,
+          );
+        } else {
+          selectedChild = list.first;
+        }
+        await prefs.setInt(activeChildIdKey, selectedChild.id);
+        _hrService.setActiveChild(selectedChild.id);
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _activeChild = selectedChild;
+      });
+    } catch (_) {}
   }
 
   Future<void> _fetchUserData() async {
@@ -197,6 +231,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final childName = _activeChild != null && _activeChild!.nickname.isNotEmpty
+        ? _activeChild!.nickname
+        : _userName;
+    final initial = childName.trim().isNotEmpty
+        ? childName.trim()[0].toUpperCase()
+        : '?';
+    final subtitleText = _activeChild != null
+        ? '${DateTime.now().year - _activeChild!.birthYear} tahun'
+        : _userEmail;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F4EF),
       appBar: AppBar(
@@ -216,7 +260,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         child: Column(
           children: [
-            // User Card
+            // Active Child Card
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -231,18 +275,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Container(
-                    width: 56,
-                    height: 56,
+                    width: 72,
+                    height: 72,
+                    alignment: Alignment.center,
                     decoration: const BoxDecoration(
                       color: Color(0xFFE3EEDF),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
-                      Icons.person_rounded,
-                      size: 32,
-                      color: Color(0xFF1F5C4A),
+                    child: Text(
+                      initial,
+                      style: GoogleFonts.inter(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF1F5C4A),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -251,17 +300,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _userName,
+                          childName.toUpperCase(),
                           style: GoogleFonts.inter(
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.w600,
                             color: const Color(0xFF1E2A24),
                           ),
                         ),
-                        if (_userEmail.isNotEmpty) ...[
+                        if (subtitleText.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           Text(
-                            _userEmail,
+                            subtitleText,
                             style: GoogleFonts.inter(
                               fontSize: 13,
                               color: const Color(0xFF6F7B74),
@@ -269,6 +318,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ],
                       ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Align(
+                    alignment: Alignment.bottomRight,
+                    child: TextButton(
+                      onPressed: () {},
+                      style: TextButton.styleFrom(
+                        backgroundColor: const Color(0xFFE8F0E3),
+                        foregroundColor: const Color(0xFF1F5C4A),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: const StadiumBorder(),
+                      ),
+                      child: Text(
+                        'Edit profil',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF1F5C4A),
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -318,10 +390,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (context) => ManageChildrenScreen(
-                            onChildrenUpdated: widget.onChildrenChanged,
+                            onChildrenUpdated: () {
+                              _fetchActiveChild();
+                              widget.onChildrenChanged?.call();
+                            },
                           ),
                         ),
                       );
+                      await _fetchActiveChild();
                       widget.onChildrenChanged?.call();
                     },
                   ),
