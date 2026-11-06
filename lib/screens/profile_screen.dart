@@ -99,6 +99,218 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _showEditProfileSheet() async {
+    final activeChild = _activeChild;
+    final nicknameController = TextEditingController(text: activeChild?.nickname ?? '');
+    final birthYearController = TextEditingController(
+      text: activeChild != null ? activeChild.birthYear.toString() : '',
+    );
+    final formKey = GlobalKey<FormState>();
+    bool isSaving = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (sheetCtx, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 24,
+              ),
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Edit profil',
+                        style: GoogleFonts.inter(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF1E2A24),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: nicknameController,
+                        decoration: InputDecoration(
+                          labelText: 'Nama panggilan',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        validator: (value) {
+                          final trimmed = value?.trim() ?? '';
+                          if (trimmed.isEmpty) {
+                            return 'Nama tidak boleh kosong';
+                          }
+                          if (trimmed.length > 255) {
+                            return 'Nama maksimal 255 karakter';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: birthYearController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: 'Tahun lahir',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        validator: (value) {
+                          final trimmed = value?.trim() ?? '';
+                          if (trimmed.isEmpty) {
+                            return 'Tahun lahir tidak boleh kosong';
+                          }
+                          final year = int.tryParse(trimmed);
+                          final currentYear = DateTime.now().year;
+                          if (year == null || year < 1900 || year > currentYear) {
+                            return 'Masukkan tahun yang valid';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          onPressed: () async {
+                            Navigator.pop(ctx);
+                            if (!mounted) return;
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ManageChildrenScreen(
+                                  onChildrenUpdated: () {
+                                    _fetchActiveChild();
+                                    widget.onChildrenChanged?.call();
+                                  },
+                                ),
+                              ),
+                            );
+                            await _fetchActiveChild();
+                            widget.onChildrenChanged?.call();
+                          },
+                          child: Text(
+                            'Kelola anak',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF1F5C4A),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: isSaving ? null : () => Navigator.pop(ctx),
+                            child: Text(
+                              'Batal',
+                              style: GoogleFonts.inter(color: const Color(0xFF6F7B74)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: isSaving
+                                ? null
+                                : () async {
+                                    if (!formKey.currentState!.validate()) return;
+                                    if (activeChild == null) return;
+                                    setSheetState(() {
+                                      isSaving = true;
+                                    });
+                                    final nickname = nicknameController.text.trim();
+                                    final birthYear = int.parse(birthYearController.text.trim());
+                                    final navigator = Navigator.of(ctx);
+                                    final messenger = ScaffoldMessenger.of(context);
+
+                                    final updated = await _apiService.updateChild(
+                                      id: activeChild.id,
+                                      nickname: nickname,
+                                      birthYear: birthYear,
+                                    );
+                                    navigator.pop();
+                                    if (!mounted) return;
+                                    if (updated != null) {
+                                      setState(() {
+                                        _activeChild = updated;
+                                      });
+                                      await _fetchActiveChild();
+                                      widget.onChildrenChanged?.call();
+                                      if (!mounted) return;
+                                      messenger.showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Profil anak berhasil diperbarui'),
+                                          backgroundColor: Color(0xFF1F5C4A),
+                                        ),
+                                      );
+                                    } else {
+                                      messenger.showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Gagal memperbarui profil anak'),
+                                          backgroundColor: Colors.redAccent,
+                                        ),
+                                      );
+                                    }
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF1F5C4A),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: isSaving
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Text('Simpan'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _handleDataSourceSelection() async {
     final currentMode = _hrService.currentMode;
     final selectedMode = await showDialog<Mode>(
@@ -323,25 +535,107 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(width: 8),
                   Align(
                     alignment: Alignment.bottomRight,
-                    child: TextButton(
-                      onPressed: () {},
-                      style: TextButton.styleFrom(
-                        backgroundColor: const Color(0xFFE8F0E3),
-                        foregroundColor: const Color(0xFF1F5C4A),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        shape: const StadiumBorder(),
-                      ),
-                      child: Text(
-                        'Edit profil',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF1F5C4A),
+                    child: Semantics(
+                      label: 'Edit profil',
+                      button: true,
+                      child: TextButton(
+                        onPressed: _showEditProfileSheet,
+                        style: TextButton.styleFrom(
+                          backgroundColor: const Color(0xFFE8F0E3),
+                          foregroundColor: const Color(0xFF1F5C4A),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          shape: const StadiumBorder(),
+                        ),
+                        child: Text(
+                          'Edit profil',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF1F5C4A),
+                          ),
                         ),
                       ),
                     ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Informasi pendamping
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Informasi pendamping',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF1E2A24),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Nama orang tua/wali',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: const Color(0xFF6F7B74),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _userName,
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1E2A24),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Divider(height: 1),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Email akun',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: const Color(0xFF6F7B74),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _userEmail.isNotEmpty ? _userEmail : '-',
+                          textAlign: TextAlign.right,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF1E2A24),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -484,28 +778,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       );
                     },
                   ),
-                  const Divider(height: 1, indent: 64, endIndent: 20),
-
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.logout_rounded, color: Colors.redAccent, size: 20),
-                    ),
-                    title: Text(
-                      'Keluar',
-                      style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500, color: Colors.redAccent),
-                    ),
-                    trailing: const Icon(Icons.chevron_right_rounded, color: Colors.redAccent),
-                    onTap: _handleLogout,
-                  ),
                 ],
               ),
             ),
           ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: Semantics(
+              label: 'Keluar',
+              button: true,
+              child: ElevatedButton(
+                onPressed: _handleLogout,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD01A10),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  'Keluar',
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
           ],
         ),
       ),
