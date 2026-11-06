@@ -589,3 +589,4 @@ class _JournalPrivacyScreenState extends State<JournalPrivacyScreen> {
     );
   }
 }
+

@@ -11,6 +11,7 @@ import 'package:siband/screens/event_note_screen.dart';
 import 'package:siband/screens/help_screen.dart';
 import 'package:siband/screens/home_screen.dart';
 import 'package:siband/screens/journal_privacy_screen.dart';
+import 'package:siband/screens/location_screen.dart';
 import 'package:siband/screens/main_navigation_screen.dart';
 import 'package:siband/screens/profile_screen.dart';
 import 'package:siband/services/auth_service.dart';
@@ -233,7 +234,7 @@ void main() {
       // Tap GPS
       await tester.tap(find.text('GPS'));
       await tester.pumpAndSettle();
-      expect(find.text('Segera hadir'), findsOneWidget);
+      expect(find.text('Lokasi anak'), findsOneWidget);
 
       // Tap Profil
       await tester.tap(find.text('Profil'));
@@ -1015,6 +1016,138 @@ void main() {
         final expectedUpdatedAge = DateTime.now().year - 2020;
         expect(find.text('DAMAR'), findsOneWidget);
         expect(find.text('$expectedUpdatedAge tahun'), findsOneWidget);
+      },
+    );
+  });
+
+  group('LocationScreen (GPS Tab) Tests', () {
+    const gpsTestSizes = [
+      Size(360, 640),
+      Size(412, 915),
+      Size(1280, 720),
+    ];
+
+    for (final size in gpsTestSizes) {
+      testWidgets(
+        'Tab GPS tata letak di ${size.width.toInt()}x${size.height.toInt()}: bar bawah menempel & <=96, tombol Perbarui Lokasi terlihat setelah scroll',
+        (tester) async {
+          tester.view.physicalSize = size;
+          tester.view.devicePixelRatio = 1.0;
+          addTearDown(() {
+            tester.view.resetPhysicalSize();
+            tester.view.resetDevicePixelRatio();
+            HttpOverrides.global = null;
+          });
+
+          SharedPreferences.setMockInitialValues({});
+
+          await tester.pumpWidget(
+            buildTestable(
+              MainNavigationScreen(
+                initialIndex: 3,
+                initialChildren: mockChildren,
+                onFetchChildren: () async => mockChildren,
+              ),
+              size: size,
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          expect(tester.takeException(), isNull);
+
+          final mainScaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
+          expect(mainScaffold.bottomNavigationBar, isNotNull);
+          final bottomNavFinder = find.byWidget(mainScaffold.bottomNavigationBar!);
+          final bottomNavRect = tester.getRect(bottomNavFinder);
+
+          expect(bottomNavRect.height, lessThanOrEqualTo(96.0));
+          expect(bottomNavRect.bottom, equals(size.height));
+
+          final bodyFinder = find.byType(IndexedStack);
+          final bodyRect = tester.getRect(bodyFinder);
+          expect(bodyRect.height, greaterThan(0));
+          expect(bodyRect.bottom, lessThanOrEqualTo(bottomNavRect.top));
+
+          // Pastikan tombol Perbarui Lokasi terlihat di dalam layar setelah scroll bila perlu
+          final updateBtnFinder = find.widgetWithText(ElevatedButton, 'Perbarui Lokasi');
+          expect(updateBtnFinder, findsOneWidget);
+          await tester.ensureVisible(updateBtnFinder);
+          await tester.pumpAndSettle();
+          final updateRect = tester.getRect(updateBtnFinder);
+          expect(updateRect.top, greaterThanOrEqualTo(0));
+          expect(updateRect.bottom, lessThanOrEqualTo(bottomNavRect.top));
+        },
+      );
+    }
+
+    testWidgets(
+      'LocationScreen tidak memanggil klien HTTP sama sekali, tidak memuat kata terhubung/menit lalu, dan menampilkan SnackBar saat Perbarui Lokasi diketuk',
+      (tester) async {
+        addTearDown(() {
+          HttpOverrides.global = null;
+        });
+
+        HttpOverrides.global = _MockProfileHttpOverrides((req) async {
+          fail('LocationScreen dilarang melakukan pemanggilan HTTP: ${req.method} ${req.uri}');
+        });
+
+        await tester.pumpWidget(buildTestable(const LocationScreen()));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Lokasi anak'), findsOneWidget);
+        expect(find.text('Mode contoh'), findsOneWidget);
+        expect(find.text('Data demo · bukan lokasi sebenarnya'), findsOneWidget);
+        expect(find.text('Lokasi terakhir (demo)'), findsOneWidget);
+        expect(find.text('Lokasi terakhir diketahui'), findsOneWidget);
+        expect(find.text('Koordinat GPS belum tersedia pada prototipe.'), findsOneWidget);
+        expect(find.text('Pembaruan: -'), findsOneWidget);
+        expect(find.text('Fitur lokasi di luar cakupan versi ini. Tampilan di atas hanya contoh.'), findsOneWidget);
+
+        // Tidak boleh ada teks "terhubung" atau "menit lalu"
+        final allTexts = tester
+            .widgetList<Text>(find.byType(Text))
+            .map((t) => (t.data ?? '').toLowerCase())
+            .join(' ');
+        expect(allTexts.contains('terhubung'), isFalse);
+        expect(allTexts.contains('menit lalu'), isFalse);
+
+        // Ketuk Perbarui Lokasi -> tampilkan SnackBar tanpa memanggil HTTP
+        final updateBtnFinder = find.widgetWithText(ElevatedButton, 'Perbarui Lokasi');
+        await tester.ensureVisible(updateBtnFinder);
+        await tester.pumpAndSettle();
+        await tester.tap(updateBtnFinder);
+        await tester.pump();
+
+        expect(find.text('Pelacakan lokasi belum tersedia pada prototipe.'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'Tombol kembali kiri atas pada tab GPS berpindah ke tab Beranda',
+      (tester) async {
+        await tester.pumpWidget(
+          buildTestable(
+            MainNavigationScreen(
+              initialIndex: 3,
+              initialChildren: mockChildren,
+              onFetchChildren: () async => mockChildren,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Lokasi anak'), findsOneWidget);
+
+        final backBtnFinder = find.descendant(
+          of: find.byType(LocationScreen),
+          matching: find.byIcon(Icons.arrow_back_rounded),
+        );
+        expect(backBtnFinder, findsOneWidget);
+
+        await tester.tap(backBtnFinder);
+        await tester.pumpAndSettle();
+
+        expect(find.text('PEMANTAUAN DETAK JANTUNG'), findsOneWidget);
       },
     );
   });

@@ -98,7 +98,8 @@ Ditempatkan di folder `siband-backend/`:
 | **Rekap Bulanan** | ✅ Selesai | Ringkasan agregasi bulanan, rata-rata, maksimum BPM, dan grafik harian. |
 | **Tautan Terapis (Backend + Halaman Web)** | ✅ Selesai | Pembuatan token share link dan web statis `share.html` baca-saja. |
 | **Panduan** | ✅ Selesai (konten statis) | Layar panduan relaksasi, tips penanganan, dan edukasi terapis. |
-| **Tab GPS** | 🟡 Placeholder | Halaman penampung integrasi lokasi anak untuk fase berikutnya. |
+| **Profil, Jurnal & privasi, dan Bantuan** | ✅ Selesai | Kartu profil anak aktif, edit profil, informasi pendamping, jurnal kejadian, privasi, dan bantuan. |
+| **Tab GPS** | 🟡 Tampilan contoh (tanpa data lokasi nyata, di luar cakupan) | Tampilan statis mode contoh tanpa pembacaan GPS maupun pemanggilan backend. |
 | **Alert / Notifikasi** | ⏳ Belum | Sistem peringatan dini saat BPM melewati ambang batas tertentu. |
 | **Sinkron Riwayat dari Jam** | ⏳ Belum | Penarikan data riwayat offline/buffer internal smartwatch. |
 | **Uji BLE di HP** | ⏳ Belum | Pengujian komprehensif end-to-end langsung pada perangkat fisik. |
