@@ -7,7 +7,7 @@ Endpoint ini menyediakan data analisis detak jantung (*heart rate*) dan catatan 
 ## 1. Endpoint & Parameter Query
 
 ```http
-GET /api/children/{child}/analysis?from=<ISO8601>&to=<ISO8601>
+GET /api/children/{child}/analysis?from=<ISO8601>&to=<ISO8601>&tz=<IANA_Timezone>
 Authorization: Bearer <token>
 Accept: application/json
 ```
@@ -20,10 +20,12 @@ Accept: application/json
 ### Parameter Query
 | Parameter | Tipe | Wajib | Default | Keterangan |
 | :--- | :---: | :---: | :--- | :--- |
-| `from` | `string` (ISO 8601) | Tidak | Hari ini pukul `00:00:00` (timezone aplikasi) | Waktu awal jendela analisis. |
-| `to` | `string` (ISO 8601) | Tidak | Waktu sekarang (`now` pada timezone aplikasi) | Waktu akhir jendela analisis. Jika melebihi waktu sekarang, otomatis dibatasi (*clamped*) ke waktu sekarang. |
+| `tz` | `string` (IANA Timezone) | Tidak | `Asia/Jakarta` (`config('analysis.default_timezone')`) | Identifier zona waktu IANA (divalidasi terhadap `DateTimeZone::listIdentifiers()`, misalnya `Asia/Jakarta`, `Asia/Makassar`, `UTC`). Menentukan perhitungan awal hari default (`00:00`), pengelompokan jam lokal pada `patterns.hourly` dan `quality.per_hour`, serta offset seluruh timestamp pada respons JSON. |
+| `from` | `string` (ISO 8601) | Tidak | Hari ini pukul `00:00:00` di `tz` | Waktu awal jendela analisis. Jika dikirim eksplisit dengan offset, nilainya dihormati dan dikonversi ke offset `tz`. |
+| `to` | `string` (ISO 8601) | Tidak | Waktu sekarang (`now` di `tz`) | Waktu akhir jendela analisis. Jika dikirim eksplisit dengan offset, nilainya dihormati. Jika melebihi waktu sekarang, otomatis dibatasi (*clamped*) ke waktu sekarang. |
 
-### Validasi Rentang Waktu (`422 Unprocessable Entity`)
+### Validasi Parameter & Rentang Waktu (`422 Unprocessable Entity`)
+- `tz` bukan identifier zona waktu IANA yang valid menurut `DateTimeZone::listIdentifiers()`.
 - Format `from` atau `to` tidak dapat di-parse sebagai tanggal/waktu valid.
 - `to <= from`.
 - Selisih `to - from` melebihi batas maksimal `config('analysis.max_span_days')` (default `7` hari).
@@ -36,6 +38,7 @@ Accept: application/json
 
 | Kunci Konfigurasi | Nilai Default | Status | Keterangan |
 | :--- | :---: | :---: | :--- |
+| `default_timezone` | `'Asia/Jakarta'` | Konfigurasi | Zona waktu IANA default bila parameter query `tz` tidak dikirim. |
 | `gap_min_seconds` | `150` | Nilai sementara | Selisih waktu antar sampel berurutan (detik) di atas nilai ini dikategorikan sebagai jeda sensor (`sensor_gaps`). |
 | `stale_after_seconds` | `420` | Nilai sementara | Batas usia sampel terakhir (detik) sebelum status pengukuran dinyatakan `tidak_ada_data`. |
 | `expected_rest_seconds` | `300` | Nilai sementara | Perkiraan durasi istirahat alami sensor jam (*duty-cycle* ~5 menit, pengamatan awal, belum terbukti). |
@@ -59,9 +62,9 @@ Accept: application/json
     "nickname": "Bima"
   },
   "window": {
-    "from": "2026-11-06T00:00:00+00:00",
-    "to": "2026-11-06T12:00:00+00:00",
-    "timezone": "UTC"
+    "from": "2026-11-06T00:00:00+07:00",
+    "to": "2026-11-06T12:00:00+07:00",
+    "timezone": "Asia/Jakarta"
   },
   "baseline": {
     "sufficient": true,
@@ -73,7 +76,7 @@ Accept: application/json
   },
   "current": {
     "bpm": 84,
-    "recorded_at": "2026-11-06T11:59:00+00:00",
+    "recorded_at": "2026-11-06T11:59:00+07:00",
     "age_seconds": 60,
     "status": "dalam_rentang",
     "measurement_state": "mengukur",
@@ -81,27 +84,27 @@ Accept: application/json
   },
   "series": [
     {
-      "t": "2026-11-06T09:00:00+00:00",
+      "t": "2026-11-06T09:00:00+07:00",
       "bpm": 82
     },
     {
-      "t": "2026-11-06T09:01:00+00:00",
+      "t": "2026-11-06T09:01:00+07:00",
       "bpm": 105
     },
     {
-      "t": "2026-11-06T09:02:00+00:00",
+      "t": "2026-11-06T09:02:00+07:00",
       "bpm": 125
     },
     {
-      "t": "2026-11-06T09:04:00+00:00",
+      "t": "2026-11-06T09:04:00+07:00",
       "bpm": 112
     }
   ],
   "resolution_seconds": 0,
   "sensor_gaps": [
     {
-      "from": "2026-11-06T09:04:00+00:00",
-      "to": "2026-11-06T09:10:00+00:00",
+      "from": "2026-11-06T09:04:00+07:00",
+      "to": "2026-11-06T09:10:00+07:00",
       "duration_seconds": 360
     }
   ],
@@ -109,15 +112,15 @@ Accept: application/json
     {
       "id": 10,
       "type": "suara_keras",
-      "at": "2026-11-06T09:00:30+00:00",
+      "at": "2026-11-06T09:00:30+07:00",
       "text_preview": "Suara petir di dekat rumah"
     }
   ],
   "episodes": [
     {
       "index": 1,
-      "start": "2026-11-06T09:01:00+00:00",
-      "end": "2026-11-06T09:04:00+00:00",
+      "start": "2026-11-06T09:01:00+07:00",
+      "end": "2026-11-06T09:04:00+07:00",
       "duration_seconds": 180,
       "peak_bpm": 125,
       "delta_from_median": 45,
@@ -125,7 +128,7 @@ Accept: application/json
       "note": {
         "id": 10,
         "type": "suara_keras",
-        "at": "2026-11-06T09:00:30+00:00",
+        "at": "2026-11-06T09:00:30+07:00",
         "text_preview": "Suara petir di dekat rumah"
       }
     }
@@ -189,6 +192,7 @@ Accept: application/json
   },
   "meta": {
     "parameters": {
+      "default_timezone": "Asia/Jakarta",
       "gap_min_seconds": 150,
       "stale_after_seconds": 420,
       "expected_rest_seconds": 300,
