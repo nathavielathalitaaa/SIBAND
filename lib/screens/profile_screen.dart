@@ -6,9 +6,12 @@ import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/heart_rate_service.dart';
 import 'bpm_dashboard_screen.dart' hide Mode, HrSensorStatus;
+import 'help_screen.dart';
+import 'journal_privacy_screen.dart';
 import 'manage_children_screen.dart';
 import 'onboarding_screen.dart';
 import 'pair_device_screen.dart';
+import 'placeholder_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback? onChildrenChanged;
@@ -403,6 +406,212 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _openDeviceAndDataSourceSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (sheetCtx, setSheetState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Perangkat & sumber data',
+                      style: GoogleFonts.inter(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF1E2A24),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE3EEDF),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.sensors_rounded, color: Color(0xFF1F5C4A), size: 20),
+                      ),
+                      title: Text(
+                        'Sumber data',
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF1E2A24),
+                        ),
+                      ),
+                      subtitle: Text(
+                        _hrService.currentMode == Mode.dummy ? 'Mode Dummy' : 'BLE Asli',
+                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF6F7B74)),
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF6F7B74)),
+                      onTap: () async {
+                        await _handleDataSourceSelection();
+                        if (sheetCtx.mounted) setSheetState(() {});
+                        if (mounted) setState(() {});
+                      },
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE3EEDF),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.watch_rounded, color: Color(0xFF1F5C4A), size: 20),
+                      ),
+                      title: Text(
+                        'Pasang jam',
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF1E2A24),
+                        ),
+                      ),
+                      subtitle: Text(
+                        _hrService.pairedDeviceName != null
+                            ? _hrService.pairedDeviceName!
+                            : 'Belum ada jam terpasang',
+                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF6F7B74)),
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF6F7B74)),
+                      onTap: () async {
+                        Navigator.pop(ctx);
+                        if (!mounted) return;
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PairDeviceScreen(
+                              childId: _activeChild?.id,
+                              childNickname: _activeChild?.nickname,
+                            ),
+                          ),
+                        );
+                        if (mounted) setState(() {});
+                      },
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE3EEDF),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.developer_board_rounded, color: Color(0xFF1F5C4A), size: 20),
+                      ),
+                      title: Text(
+                        'Layar teknis (lama)',
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF1E2A24),
+                        ),
+                      ),
+                      subtitle: Text(
+                        'BpmDashboardScreen lama untuk pengujian BLE langsung',
+                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF6F7B74)),
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF6F7B74)),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        if (!mounted) return;
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const BpmDashboardScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildPreferenceCard({
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return Semantics(
+      label: title,
+      button: true,
+      child: Container(
+        height: 56,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF1E2A24),
+                      ),
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: Color(0xFF6F7B74),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
 
   Future<void> _handleLogout() async {
     final confirmed = await showDialog<bool>(
@@ -642,146 +851,71 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Settings Group
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(20),
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  children: [
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE3EEDF),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.child_care_rounded, color: Color(0xFF1F5C4A), size: 20),
-                    ),
-                    title: Text(
-                      'Kelola anak',
-                      style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500, color: const Color(0xFF1E2A24)),
-                    ),
-                    subtitle: Text(
-                      'Daftar, tambah, ubah, dan hapus profil anak',
-                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF6F7B74)),
-                    ),
-                    trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF6F7B74)),
-                    onTap: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ManageChildrenScreen(
-                            onChildrenUpdated: () {
-                              _fetchActiveChild();
-                              widget.onChildrenChanged?.call();
-                            },
-                          ),
-                        ),
-                      );
-                      await _fetchActiveChild();
-                      widget.onChildrenChanged?.call();
-                    },
-                  ),
-                  const Divider(height: 1, indent: 64, endIndent: 20),
-
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE3EEDF),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.sensors_rounded, color: Color(0xFF1F5C4A), size: 20),
-                    ),
-                    title: Text(
-                      'Sumber data',
-                      style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500, color: const Color(0xFF1E2A24)),
-                    ),
-                    subtitle: Text(
-                      _hrService.currentMode == Mode.dummy ? 'Mode Dummy' : 'BLE Asli',
-                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF6F7B74)),
-                    ),
-                    trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF6F7B74)),
-                    onTap: _handleDataSourceSelection,
-                  ),
-                  const Divider(height: 1, indent: 64, endIndent: 20),
-
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE3EEDF),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.watch_rounded, color: Color(0xFF1F5C4A), size: 20),
-                    ),
-                    title: Text(
-                      'Jam terpasang',
-                      style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500, color: const Color(0xFF1E2A24)),
-                    ),
-                    subtitle: Text(
-                      _hrService.pairedDeviceName != null
-                          ? _hrService.pairedDeviceName!
-                          : 'Belum ada jam terpasang',
-                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF6F7B74)),
-                    ),
-                    trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF6F7B74)),
-                    onTap: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const PairDeviceScreen(),
-                        ),
-                      );
-                      if (mounted) setState(() {});
-                    },
-                  ),
-                  const Divider(height: 1, indent: 64, endIndent: 20),
-
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE3EEDF),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.developer_board_rounded, color: Color(0xFF1F5C4A), size: 20),
-                    ),
-                    title: Text(
-                      'Layar teknis (lama)',
-                      style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500, color: const Color(0xFF1E2A24)),
-                    ),
-                    subtitle: Text(
-                      'BpmDashboardScreen lama untuk pengujian BLE langsung',
-                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF6F7B74)),
-                    ),
-                    trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF6F7B74)),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const BpmDashboardScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
+            // Preferensi pendampingan
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Preferensi pendampingan',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF1E2A24),
+                ),
               ),
             ),
-          ),
+            const SizedBox(height: 12),
+            _buildPreferenceCard(
+              title: 'Jurnal harian & pengaturan privasi',
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => JournalPrivacyScreen(
+                      initialChild: _activeChild,
+                      onChildrenChanged: () {
+                        _fetchActiveChild();
+                        widget.onChildrenChanged?.call();
+                      },
+                    ),
+                  ),
+                );
+                await _fetchActiveChild();
+                widget.onChildrenChanged?.call();
+              },
+            ),
+            const SizedBox(height: 10),
+            _buildPreferenceCard(
+              title: 'Pengingat jurnal & zona aman',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PlaceholderScreen(
+                      title: 'Segera hadir',
+                      message: 'Pengingat dan zona aman belum tersedia pada prototipe.',
+                      icon: Icons.notifications_active_outlined,
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+            _buildPreferenceCard(
+              title: 'Bantuan dan dukungan',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const HelpScreen(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+            _buildPreferenceCard(
+              title: 'Perangkat & sumber data',
+              onTap: _openDeviceAndDataSourceSheet,
+            ),
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,

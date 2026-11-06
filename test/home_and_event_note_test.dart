@@ -8,7 +8,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:siband/models/child_model.dart';
 import 'package:siband/screens/event_note_screen.dart';
+import 'package:siband/screens/help_screen.dart';
 import 'package:siband/screens/home_screen.dart';
+import 'package:siband/screens/journal_privacy_screen.dart';
 import 'package:siband/screens/main_navigation_screen.dart';
 import 'package:siband/screens/profile_screen.dart';
 import 'package:siband/services/auth_service.dart';
@@ -236,9 +238,11 @@ void main() {
       // Tap Profil
       await tester.tap(find.text('Profil'));
       await tester.pumpAndSettle();
-      expect(find.text('Kelola anak'), findsOneWidget);
-      expect(find.text('Sumber data'), findsOneWidget);
-      expect(find.text('Layar teknis (lama)'), findsOneWidget);
+      expect(find.text('Preferensi pendampingan'), findsOneWidget);
+      expect(find.text('Jurnal harian & pengaturan privasi'), findsOneWidget);
+      expect(find.text('Pengingat jurnal & zona aman'), findsOneWidget);
+      expect(find.text('Bantuan dan dukungan'), findsOneWidget);
+      expect(find.text('Perangkat & sumber data'), findsOneWidget);
       expect(find.text('Keluar'), findsOneWidget);
 
       // Return to Beranda
@@ -495,9 +499,11 @@ void main() {
 
       expect(find.text('Profil'), findsOneWidget);
       expect(find.text('Informasi pendamping'), findsOneWidget);
-      expect(find.text('Kelola anak'), findsOneWidget);
-      expect(find.text('Sumber data'), findsOneWidget);
-      expect(find.text('Layar teknis (lama)'), findsOneWidget);
+      expect(find.text('Preferensi pendampingan'), findsOneWidget);
+      expect(find.text('Jurnal harian & pengaturan privasi'), findsOneWidget);
+      expect(find.text('Pengingat jurnal & zona aman'), findsOneWidget);
+      expect(find.text('Bantuan dan dukungan'), findsOneWidget);
+      expect(find.text('Perangkat & sumber data'), findsOneWidget);
       expect(find.text('Keluar'), findsOneWidget);
     });
 
@@ -509,7 +515,7 @@ void main() {
 
     for (final size in profileTestSizes) {
       testWidgets(
-        'Tab Profil tata letak di ${size.width.toInt()}x${size.height.toInt()}: bar bawah menempel & <=96, Edit profil & Keluar terlihat setelah scroll',
+        'Tab Profil tata letak di ${size.width.toInt()}x${size.height.toInt()}: bar bawah menempel & <=96, 4 menu preferensi, Edit profil & Keluar terlihat setelah scroll',
         (tester) async {
           tester.view.physicalSize = size;
           tester.view.devicePixelRatio = 1.0;
@@ -579,6 +585,22 @@ void main() {
           expect(editRect.top, greaterThanOrEqualTo(0));
           expect(editRect.bottom, lessThanOrEqualTo(bottomNavRect.top));
 
+          // Pastikan keempat baris menu ada dan masuk di dalam viewport setelah scroll
+          for (final menuLabel in [
+            'Jurnal harian & pengaturan privasi',
+            'Pengingat jurnal & zona aman',
+            'Bantuan dan dukungan',
+            'Perangkat & sumber data',
+          ]) {
+            final menuFinder = find.text(menuLabel);
+            expect(menuFinder, findsOneWidget);
+            await tester.ensureVisible(menuFinder);
+            await tester.pumpAndSettle();
+            final menuRect = tester.getRect(menuFinder);
+            expect(menuRect.top, greaterThanOrEqualTo(0));
+            expect(menuRect.bottom, lessThanOrEqualTo(bottomNavRect.top));
+          }
+
           // Pastikan tombol Keluar terlihat di dalam layar setelah scroll
           final keluarBtnFinder = find.widgetWithText(ElevatedButton, 'Keluar');
           expect(keluarBtnFinder, findsOneWidget);
@@ -590,6 +612,264 @@ void main() {
         },
       );
     }
+
+    testWidgets(
+      'Keempat baris Preferensi pendampingan bisa diketuk, termasuk Perangkat & sumber data membuka Pasang jam',
+      (tester) async {
+        addTearDown(() {
+          HttpOverrides.global = null;
+        });
+
+        SharedPreferences.setMockInitialValues({
+          AuthService.tokenKey: 'mock_token',
+          ConfigService.apiBaseUrlKey: 'http://127.0.0.1:8000/api',
+        });
+
+        HttpOverrides.global = _MockProfileHttpOverrides((req) async {
+          final fakeReq = req as _FakeHttpClientRequest;
+          if (req.uri.path.endsWith('/user')) {
+            fakeReq.responseStatusCode = 200;
+            fakeReq.responseBody = jsonEncode({'name': 'Bunda', 'email': 'bunda@example.com'});
+          } else if (req.uri.path.endsWith('/children')) {
+            fakeReq.responseStatusCode = 200;
+            fakeReq.responseBody = jsonEncode([
+              {'id': 1, 'user_id': 1, 'nickname': 'Bima', 'birth_year': 2018},
+            ]);
+          } else {
+            fakeReq.responseStatusCode = 200;
+            fakeReq.responseBody = '[]';
+          }
+        });
+
+        await tester.pumpWidget(buildTestable(const ProfileScreen()));
+        await tester.pumpAndSettle();
+
+        // 1. Jurnal harian & pengaturan privasi
+        await tester.ensureVisible(find.text('Jurnal harian & pengaturan privasi'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Jurnal harian & pengaturan privasi'));
+        await tester.pumpAndSettle();
+        expect(find.byType(JournalPrivacyScreen), findsOneWidget);
+        expect(find.text('Jurnal catatan kejadian'), findsOneWidget);
+        await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+        await tester.pumpAndSettle();
+
+        // 2. Pengingat jurnal & zona aman
+        await tester.ensureVisible(find.text('Pengingat jurnal & zona aman'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Pengingat jurnal & zona aman'));
+        await tester.pumpAndSettle();
+        expect(find.text('Segera hadir'), findsAtLeastNWidgets(1));
+        expect(find.text('Pengingat dan zona aman belum tersedia pada prototipe.'), findsOneWidget);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+
+        // 3. Bantuan dan dukungan
+        await tester.ensureVisible(find.text('Bantuan dan dukungan'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Bantuan dan dukungan'));
+        await tester.pumpAndSettle();
+        expect(find.byType(HelpScreen), findsOneWidget);
+        expect(find.text('Cara kerja singkat'), findsOneWidget);
+        await tester.tap(find.byIcon(Icons.arrow_back_rounded));
+        await tester.pumpAndSettle();
+
+        // 4. Perangkat & sumber data -> memuat Pasang jam, Sumber data, Layar teknis (lama)
+        await tester.ensureVisible(find.text('Perangkat & sumber data'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Perangkat & sumber data'));
+        await tester.pumpAndSettle();
+        expect(find.text('Sumber data'), findsOneWidget);
+        expect(find.text('Pasang jam'), findsOneWidget);
+        expect(find.text('Layar teknis (lama)'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'Layar jurnal menampilkan catatan kejadian, menolak hapus saat Batal, dan menghapus catatan saat dikonfirmasi',
+      (tester) async {
+        addTearDown(() {
+          HttpOverrides.global = null;
+        });
+
+        SharedPreferences.setMockInitialValues({
+          AuthService.tokenKey: 'mock_token',
+          ConfigService.apiBaseUrlKey: 'http://127.0.0.1:8000/api',
+        });
+
+        final notesList = <Map<String, dynamic>>[
+          {
+            'id': 101,
+            'child_id': 1,
+            'type': 'suara_keras',
+            'note': 'Suara petir sore hari',
+            'occurred_at': '2026-11-05 16:30:00',
+          },
+          {
+            'id': 102,
+            'child_id': 1,
+            'type': 'transisi',
+            'note': 'Pindah dari bermain ke mandi',
+            'occurred_at': '2026-11-05 17:00:00',
+          },
+        ];
+
+        int? deletedNoteId;
+
+        HttpOverrides.global = _MockProfileHttpOverrides((req) async {
+          final fakeReq = req as _FakeHttpClientRequest;
+          if (req.method == 'GET' && req.uri.path.endsWith('/children/1/event-notes')) {
+            fakeReq.responseStatusCode = 200;
+            fakeReq.responseBody = jsonEncode(notesList);
+          } else if (req.method == 'DELETE' && req.uri.path.contains('/event-notes/')) {
+            final idStr = req.uri.pathSegments.last;
+            deletedNoteId = int.tryParse(idStr);
+            notesList.removeWhere((n) => n['id'] == deletedNoteId);
+            fakeReq.responseStatusCode = 200;
+            fakeReq.responseBody = jsonEncode({'deleted': true});
+          } else {
+            fakeReq.responseStatusCode = 200;
+            fakeReq.responseBody = '[]';
+          }
+        });
+
+        await tester.pumpWidget(
+          buildTestable(
+            JournalPrivacyScreen(
+              initialChild: mockChildren.first,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Suara keras'), findsOneWidget);
+        expect(find.text('Suara petir sore hari'), findsOneWidget);
+        expect(find.text('Transisi kegiatan'), findsOneWidget);
+        expect(find.text('Pindah dari bermain ke mandi'), findsOneWidget);
+
+        // Ketuk ikon hapus pada item pertama lalu pilih Batal
+        final deleteIcons = find.byIcon(Icons.delete_outline_rounded);
+        expect(deleteIcons, findsNWidgets(2));
+        await tester.tap(deleteIcons.first);
+        await tester.pumpAndSettle();
+
+        expect(find.text('Hapus catatan?'), findsOneWidget);
+        await tester.tap(find.widgetWithText(TextButton, 'Batal'));
+        await tester.pumpAndSettle();
+
+        expect(deletedNoteId, isNull);
+        expect(find.text('Suara petir sore hari'), findsOneWidget);
+
+        // Ketuk ikon hapus pada item pertama lalu konfirmasi Hapus
+        await tester.tap(deleteIcons.first);
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(ElevatedButton, 'Hapus'));
+        await tester.pumpAndSettle();
+
+        expect(deletedNoteId, equals(101));
+        expect(find.text('Suara petir sore hari'), findsNothing);
+        expect(find.text('Pindah dari bermain ke mandi'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'Hapus data anak ini di JournalPrivacyScreen membutuhkan konfirmasi dua langkah',
+      (tester) async {
+        addTearDown(() {
+          HttpOverrides.global = null;
+        });
+
+        SharedPreferences.setMockInitialValues({
+          AuthService.tokenKey: 'mock_token',
+          ConfigService.apiBaseUrlKey: 'http://127.0.0.1:8000/api',
+        });
+
+        int? deletedChildId;
+
+        HttpOverrides.global = _MockProfileHttpOverrides((req) async {
+          final fakeReq = req as _FakeHttpClientRequest;
+          if (req.method == 'GET' && req.uri.path.endsWith('/children/1/event-notes')) {
+            fakeReq.responseStatusCode = 200;
+            fakeReq.responseBody = '[]';
+          } else if (req.method == 'DELETE' && req.uri.path.endsWith('/children/1')) {
+            deletedChildId = 1;
+            fakeReq.responseStatusCode = 200;
+            fakeReq.responseBody = jsonEncode({'deleted': true});
+          } else if (req.method == 'GET' && req.uri.path.endsWith('/children')) {
+            fakeReq.responseStatusCode = 200;
+            fakeReq.responseBody = jsonEncode([
+              {'id': 2, 'user_id': 1, 'nickname': 'Siti', 'birth_year': 2020},
+            ]);
+          }
+        });
+
+        await tester.pumpWidget(
+          buildTestable(
+            JournalPrivacyScreen(
+              initialChild: mockChildren.first,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Belum ada catatan kejadian'), findsOneWidget);
+
+        final deleteChildBtn = find.widgetWithText(OutlinedButton, 'Hapus data anak ini');
+        await tester.ensureVisible(deleteChildBtn);
+        await tester.pumpAndSettle();
+
+        // Percobaan 1: Batal di langkah kedua -> belum terhapus
+        await tester.tap(deleteChildBtn);
+        await tester.pumpAndSettle();
+        expect(find.text('Hapus data anak ini?'), findsOneWidget);
+
+        await tester.tap(find.widgetWithText(ElevatedButton, 'Lanjutkan'));
+        await tester.pumpAndSettle();
+        expect(find.text('Konfirmasi akhir'), findsOneWidget);
+        expect(deletedChildId, isNull);
+
+        await tester.tap(find.widgetWithText(TextButton, 'Batal'));
+        await tester.pumpAndSettle();
+        expect(deletedChildId, isNull);
+
+        // Percobaan 2: Konfirmasi kedua langkah -> DELETE /api/children/1 terpanggil
+        await tester.tap(deleteChildBtn);
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(ElevatedButton, 'Lanjutkan'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(ElevatedButton, 'Ya, hapus permanen'));
+        await tester.pumpAndSettle();
+
+        expect(deletedChildId, equals(1));
+      },
+    );
+
+    testWidgets(
+      'HelpScreen menampilkan Cara kerja singkat & Batasan serta tidak memuat pola nomor telepon',
+      (tester) async {
+        await tester.pumpWidget(buildTestable(const HelpScreen()));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Bantuan dan dukungan'), findsOneWidget);
+        expect(find.text('Cara kerja singkat'), findsOneWidget);
+        expect(find.text('Batasan'), findsOneWidget);
+        expect(
+          find.textContaining('Siband bukan alat diagnosis dan bukan pengganti tenaga profesional.'),
+          findsOneWidget,
+        );
+        expect(
+          find.text('Jika anak dalam kondisi darurat, hubungi tenaga medis atau layanan darurat setempat.'),
+          findsOneWidget,
+        );
+
+        final phonePattern = RegExp(r'(\+62|08\d{2,}|\b112\b|\b118\b|\b119\b|\d{3,}-\d{3,})');
+        final allTexts = tester
+            .widgetList<Text>(find.byType(Text))
+            .map((t) => t.data ?? '')
+            .join(' ');
+        expect(phonePattern.hasMatch(allTexts), isFalse);
+      },
+    );
 
     testWidgets(
       'Profil menampilkan nama anak HURUF BESAR, umur dari birth_year, informasi pendamping, dan tanpa teks sekolah / Siswa SLB',
