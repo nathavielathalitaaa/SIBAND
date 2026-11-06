@@ -212,3 +212,9 @@ Accept: application/json
   }
 }
 ```
+
+---
+
+## 4. Data Demo Lokal (`siband:demo-analysis`)
+
+Untuk pengujian tampilan pada lingkungan lokal/pengembangan (ditolak otomatis pada `production`), jalankan `php artisan siband:demo-analysis {child_id} [--date=YYYY-MM-DD] [--rest-minutes=5]` guna mengisi sampel detak jantung (`device_name='DEMO'`) beserta catatan kejadian (`[DEMO] ...`) pukul 06:00–14:00 WIB, atau tambahkan opsi `--purge` (`php artisan siband:demo-analysis {child_id} --purge`) untuk menghapus khusus data DEMO milik anak tersebut tanpa menyentuh data asli. **Peringatan:** Seluruh data yang dihasilkan oleh perintah ini adalah **data tiruan (sintetis)** semata untuk simulasi antarmuka, **bukan hasil pengukuran perangkat maupun subjek nyata**, serta **tidak boleh dikutip atau disajikan sebagai hasil pengujian/penelitian**.
