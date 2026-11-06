@@ -68,13 +68,17 @@ class BaselineService
 
     /**
      * Check whether a sample timestamp falls within the exclusion window after any given note.
-     * Physical activity notes cover up to 30 minutes; other excluded notes cover 10 minutes.
      */
     public function isWithinNoteExclusionWindow(Carbon $logTime, iterable $eventNotes): bool
     {
+        $noteExclusionMinutes = (int) config('analysis.note_exclusion_minutes');
+        $physicalActivityExclusionMinutes = (int) config('analysis.physical_activity_exclusion_minutes');
+
         foreach ($eventNotes as $note) {
             $noteTime = Carbon::parse($note->occurred_at);
-            $windowMinutes = ($note->type ?? null) === EventNote::TYPE_AKTIVITAS_FISIK ? 30 : 10;
+            $windowMinutes = ($note->type ?? null) === EventNote::TYPE_AKTIVITAS_FISIK
+                ? $physicalActivityExclusionMinutes
+                : $noteExclusionMinutes;
             if ($logTime->greaterThanOrEqualTo($noteTime) && $logTime->lessThanOrEqualTo($noteTime->copy()->addMinutes($windowMinutes))) {
                 return true;
             }

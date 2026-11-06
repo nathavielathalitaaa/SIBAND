@@ -24,6 +24,10 @@ return [
     // Jendela pencocokan catatan kejadian terhadap waktu mulai episode (+- detik)
     'note_match_seconds' => 300,
 
+    // Keputusan sementara, catatan kejadian hanya punya jam mulai
+    'note_exclusion_minutes' => 10,
+    'physical_activity_exclusion_minutes' => 30,
+
     // Jendela pengamatan pola kenaikan BPM setelah waktu catatan kejadian (detik)
     'pattern_window_seconds' => 600,
 

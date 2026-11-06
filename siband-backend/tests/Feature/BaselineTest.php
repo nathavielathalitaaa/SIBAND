@@ -114,4 +114,52 @@ class BaselineTest extends TestCase
             ->getJson("/api/children/{$child->id}/baseline");
         $response->assertNotFound();
     }
+
+    #[Test]
+    public function baseline_excludes_sample_20_minutes_after_physical_activity_but_keeps_sample_20_minutes_after_suara_keras()
+    {
+        $user = User::factory()->create();
+        $child = Child::factory()->create(['user_id' => $user->id]);
+        $now = Carbon::now();
+
+        // Catatan aktivitas_fisik (jendela pembuangan 30 menit) -> sampel +20 menit HARUS dibuang
+        $physicalNoteTime = $now->copy()->subHours(6);
+        EventNote::create([
+            'child_id' => $child->id,
+            'type' => EventNote::TYPE_AKTIVITAS_FISIK,
+            'note' => 'Bermain sepeda',
+            'occurred_at' => $physicalNoteTime,
+        ]);
+        HeartRateLog::create([
+            'user_id' => $user->id,
+            'child_id' => $child->id,
+            'bpm' => 115,
+            'recorded_at' => $physicalNoteTime->copy()->addMinutes(20),
+        ]);
+
+        // Catatan suara_keras (jendela pembuangan 10 menit) -> sampel +20 menit TIDAK dibuang
+        $loudNoiseNoteTime = $now->copy()->subHours(3);
+        EventNote::create([
+            'child_id' => $child->id,
+            'type' => EventNote::TYPE_SUARA_KERAS,
+            'note' => 'Suara klakson',
+            'occurred_at' => $loudNoiseNoteTime,
+        ]);
+        HeartRateLog::create([
+            'user_id' => $user->id,
+            'child_id' => $child->id,
+            'bpm' => 84,
+            'recorded_at' => $loudNoiseNoteTime->copy()->addMinutes(20),
+        ]);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->getJson("/api/children/{$child->id}/baseline?days=7");
+
+        $response->assertOk();
+        $data = $response->json();
+
+        // Sampel +20m setelah aktivitas_fisik dibuang (excluded_count=1), sampel +20m setelah suara_keras tetap dihitung (sample_count=1)
+        $this->assertSame(1, $data['sample_count']);
+        $this->assertSame(1, $data['excluded_count']);
+    }
 }

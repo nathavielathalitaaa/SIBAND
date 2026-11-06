@@ -45,10 +45,14 @@ Accept: application/json
 | `episode_margin_bpm` | `10` | Nilai sementara | Margin tambahan di atas `p75` baseline (`ambang = p75 + episode_margin_bpm`) untuk mendeteksi episode kenaikan BPM. |
 | `episode_min_duration_seconds` | `120` | Nilai sementara | Durasi minimal (detik) deretan sampel di atas ambang agar dihitung sebagai satu episode. |
 | `note_match_seconds` | `300` | Nilai sementara | Jendela waktu pencocokan catatan kejadian (`±300` detik dari awal episode). |
+| `note_exclusion_minutes` | `10` | Nilai sementara | Durasi pembuangan sampel setelah catatan kejadian non-fisik (`suara_keras`, `meltdown`) dari perhitungan baseline (menit). |
+| `physical_activity_exclusion_minutes` | `30` | Nilai sementara | Durasi pembuangan sampel setelah catatan `aktivitas_fisik` dari perhitungan baseline dan deteksi episode (menit). |
 | `pattern_window_seconds` | `600` | Nilai sementara | Jendela waktu setelah catatan kejadian (`[at, at + 600s]`) untuk menghitung rata-rata kenaikan BPM per tipe catatan. |
 | `min_notes_per_type` | `5` | Nilai sementara | Jumlah minimal catatan yang memiliki sampel pada jendela pola agar `enough` bernilai `true`. |
 | `max_span_days` | `7` | Nilai sementara | Rentang waktu maksimal (hari) yang diizinkan untuk satu permintaan analisis. |
 | `chart_max_points` | `1500` | Nilai sementara | Batas jumlah titik pada `series` sebelum dilakukan pereduksian (*downsampling*) menggunakan **median** per bucket waktu (`60` detik untuk rentang `<= 1` hari, `300` detik untuk `> 1` hari). |
+
+Parameter `note_exclusion_minutes` (`10` menit) dan `physical_activity_exclusion_minutes` (`30` menit) merupakan keputusan sementara untuk menentukan jendela pembuangan sampel setelah waktu mulai catatan karena catatan kejadian hanya menyimpan jam mulai tanpa waktu selesai.
 
 ---
 

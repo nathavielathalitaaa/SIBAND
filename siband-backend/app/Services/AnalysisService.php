@@ -41,6 +41,8 @@ class AnalysisService
         $episodeMarginBpm = (int) config('analysis.episode_margin_bpm', 10);
         $episodeMinDurationSeconds = (int) config('analysis.episode_min_duration_seconds', 120);
         $noteMatchSeconds = (int) config('analysis.note_match_seconds', 300);
+        $noteExclusionMinutes = (int) config('analysis.note_exclusion_minutes');
+        $physicalActivityExclusionMinutes = (int) config('analysis.physical_activity_exclusion_minutes');
         $patternWindowSeconds = (int) config('analysis.pattern_window_seconds', 600);
         $minNotesPerType = (int) config('analysis.min_notes_per_type', 5);
         $maxSpanDays = (int) config('analysis.max_span_days', 7);
@@ -123,7 +125,7 @@ class AnalysisService
         }
 
         // Fetch notes in window (and slightly before window for aktivitas_fisik / episode matching)
-        $lookbackStartDb = $fromDb->copy()->subSeconds(max($noteMatchSeconds, 1800));
+        $lookbackStartDb = $fromDb->copy()->subSeconds(max($noteMatchSeconds, $physicalActivityExclusionMinutes * 60));
         $lookaheadEndDb = $toDb->copy()->addSeconds($noteMatchSeconds);
         $extendedNotes = EventNote::where('child_id', $child->id)
             ->whereBetween('occurred_at', [$lookbackStartDb, $lookaheadEndDb])
@@ -305,6 +307,8 @@ class AnalysisService
                 'episode_margin_bpm' => $episodeMarginBpm,
                 'episode_min_duration_seconds' => $episodeMinDurationSeconds,
                 'note_match_seconds' => $noteMatchSeconds,
+                'note_exclusion_minutes' => $noteExclusionMinutes,
+                'physical_activity_exclusion_minutes' => $physicalActivityExclusionMinutes,
                 'pattern_window_seconds' => $patternWindowSeconds,
                 'min_notes_per_type' => $minNotesPerType,
                 'max_span_days' => $maxSpanDays,
