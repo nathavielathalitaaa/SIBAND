@@ -678,4 +678,132 @@ class AnalysisTest extends TestCase
         $this->assertStringEndsWith('+07:00', $data['episodes'][0]['end']);
         $this->assertStringEndsWith('+07:00', $data['episodes'][0]['note']['at']);
     }
+
+    #[Test]
+    public function test_20_demo_analysis_command_generates_3_episodes_and_excludes_physical_activity(): void
+    {
+        $now = Carbon::parse('2026-11-06T16:00:00+07:00');
+        Carbon::setTestNow($now);
+
+        $user = User::factory()->create();
+        $child = Child::factory()->create(['user_id' => $user->id, 'nickname' => 'Bima']);
+
+        $this->artisan('siband:demo-analysis', [
+            'child_id' => $child->id,
+            '--date' => '2026-11-06',
+            '--rest-minutes' => 5,
+        ])->assertExitCode(0);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->getJson("/api/children/{$child->id}/analysis?tz=Asia/Jakarta")
+            ->assertOk();
+
+        $data = $response->json();
+
+        $this->assertTrue($data['baseline']['sufficient']);
+        $this->assertNotEmpty($data['sensor_gaps']);
+
+        $episodes = $data['episodes'];
+        $this->assertCount(3, $episodes);
+
+        // Episode 1: 07:42 (6 minutes = 360s, peak 128), matched with transisi note at 07:40
+        $this->assertSame('2026-11-06T07:42:00+07:00', $episodes[0]['start']);
+        $this->assertSame(360, $episodes[0]['duration_seconds']);
+        $this->assertSame(128, $episodes[0]['peak_bpm']);
+        $this->assertNotNull($episodes[0]['note']);
+        $this->assertSame('transisi', $episodes[0]['note']['type']);
+        $this->assertSame('[DEMO] Berangkat sekolah', $episodes[0]['note']['text_preview']);
+
+        // Episode 2: 10:15 (4 minutes = 240s, peak 118), matched with suara_keras note at 10:13
+        $this->assertSame('2026-11-06T10:15:00+07:00', $episodes[1]['start']);
+        $this->assertSame(240, $episodes[1]['duration_seconds']);
+        $this->assertSame(118, $episodes[1]['peak_bpm']);
+        $this->assertNotNull($episodes[1]['note']);
+        $this->assertSame('suara_keras', $episodes[1]['note']['type']);
+        $this->assertSame('[DEMO] Bel istirahat', $episodes[1]['note']['text_preview']);
+
+        // Episode 3: 12:50 (9 minutes = 540s, peak 121), intentionally without note
+        $this->assertSame('2026-11-06T12:50:00+07:00', $episodes[2]['start']);
+        $this->assertSame(540, $episodes[2]['duration_seconds']);
+        $this->assertSame(121, $episodes[2]['peak_bpm']);
+        $this->assertNull($episodes[2]['note']);
+    }
+
+    #[Test]
+    public function test_21_demo_analysis_command_refuses_in_production_and_fails_when_child_missing(): void
+    {
+        $user = User::factory()->create();
+        $child = Child::factory()->create(['user_id' => $user->id]);
+
+        $originalEnv = $this->app['env'];
+        try {
+            $this->app['env'] = 'production';
+            $this->artisan('siband:demo-analysis', ['child_id' => $child->id])
+                ->assertExitCode(1);
+        } finally {
+            $this->app['env'] = $originalEnv;
+        }
+
+        $this->assertSame(0, HeartRateLog::where('child_id', $child->id)->count());
+
+        $this->artisan('siband:demo-analysis', ['child_id' => 999999])
+            ->assertExitCode(1);
+    }
+
+    #[Test]
+    public function test_22_demo_analysis_command_is_idempotent_and_purge_only_deletes_demo_data(): void
+    {
+        $now = Carbon::parse('2026-11-06T16:00:00+07:00');
+        Carbon::setTestNow($now);
+
+        $user = User::factory()->create();
+        $child = Child::factory()->create(['user_id' => $user->id]);
+
+        // Create non-DEMO data that must never be touched
+        HeartRateLog::create([
+            'user_id' => $user->id,
+            'child_id' => $child->id,
+            'device_name' => 'Infinix XWatch H4',
+            'bpm' => 84,
+            'recorded_at' => Carbon::parse('2026-11-06T08:00:00+07:00')->setTimezone('UTC'),
+        ]);
+        EventNote::create([
+            'child_id' => $child->id,
+            'type' => EventNote::TYPE_LAINNYA,
+            'note' => 'Catatan asli orang tua',
+            'occurred_at' => Carbon::parse('2026-11-06T08:05:00+07:00')->setTimezone('UTC'),
+        ]);
+
+        // First run
+        $this->artisan('siband:demo-analysis', [
+            'child_id' => $child->id,
+            '--date' => '2026-11-06',
+        ])->assertExitCode(0);
+
+        $logCountAfterFirst = HeartRateLog::where('child_id', $child->id)->count();
+        $noteCountAfterFirst = EventNote::where('child_id', $child->id)->count();
+        $this->assertGreaterThan(100, $logCountAfterFirst);
+        $this->assertSame(4, $noteCountAfterFirst); // 1 real + 3 DEMO
+
+        // Second run on the same date must not duplicate data
+        $this->artisan('siband:demo-analysis', [
+            'child_id' => $child->id,
+            '--date' => '2026-11-06',
+        ])->assertExitCode(0);
+
+        $this->assertSame($logCountAfterFirst, HeartRateLog::where('child_id', $child->id)->count());
+        $this->assertSame($noteCountAfterFirst, EventNote::where('child_id', $child->id)->count());
+
+        // Purge must remove only DEMO data and leave real data intact
+        $this->artisan('siband:demo-analysis', [
+            'child_id' => $child->id,
+            '--purge' => true,
+        ])->assertExitCode(0);
+
+        $this->assertSame(1, HeartRateLog::where('child_id', $child->id)->count());
+        $this->assertSame('Infinix XWatch H4', HeartRateLog::where('child_id', $child->id)->first()->device_name);
+
+        $this->assertSame(1, EventNote::where('child_id', $child->id)->count());
+        $this->assertSame('Catatan asli orang tua', EventNote::where('child_id', $child->id)->first()->note);
+    }
 }
