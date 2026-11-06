@@ -10,11 +10,12 @@ use App\Models\HeartRateLog;
 use App\Models\EventNote;
 use Carbon\Carbon;
 
+use PHPUnit\Framework\Attributes\Test;
 class BaselineTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @test */
+    #[Test]
     public function baseline_returns_statistics_when_enough_samples()
     {
         $user = User::factory()->create();
@@ -23,7 +24,7 @@ class BaselineTest extends TestCase
         // Create 150 heart rate logs within last 7 days, BPM within range
         $now = Carbon::now();
         foreach (range(1, 150) as $i) {
-            HeartRateLog::factory()->create([
+            HeartRateLog::create([
                 'child_id' => $child->id,
                 'bpm' => rand(60, 120),
                 'recorded_at' => $now->copy()->subDays(3)->subMinutes($i),
@@ -44,7 +45,7 @@ class BaselineTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[Test]
     public function baseline_excludes_out_of_range_and_event_related_samples()
     {
         $user = User::factory()->create();
@@ -52,13 +53,13 @@ class BaselineTest extends TestCase
         $now = Carbon::now();
 
         // In‑range log
-        HeartRateLog::factory()->create([
+        HeartRateLog::create([
             'child_id' => $child->id,
             'bpm' => 80,
             'recorded_at' => $now->copy()->subDays(1),
         ]);
         // Out‑of‑range log (should be excluded)
-        HeartRateLog::factory()->create([
+        HeartRateLog::create([
             'child_id' => $child->id,
             'bpm' => 30,
             'recorded_at' => $now->copy()->subDays(1),
@@ -69,7 +70,7 @@ class BaselineTest extends TestCase
             'type' => 'suara_keras',
             'occurred_at' => $now->copy()->subHours(5),
         ]);
-        HeartRateLog::factory()->create([
+        HeartRateLog::create([
             'child_id' => $child->id,
             'bpm' => 85,
             'recorded_at' => Carbon::parse($event->occurred_at)->addMinutes(5),
@@ -85,14 +86,14 @@ class BaselineTest extends TestCase
         $this->assertFalse($data['sufficient']);
     }
 
-    /** @test */
+    #[Test]
     public function baseline_returns_insufficient_when_few_samples()
     {
         $user = User::factory()->create();
         $child = Child::factory()->create(['user_id' => $user->id]);
         // 50 logs only
         foreach (range(1, 50) as $i) {
-            HeartRateLog::factory()->create([
+            HeartRateLog::create([
                 'child_id' => $child->id,
                 'bpm' => rand(60, 120),
                 'recorded_at' => Carbon::now()->subDays(2),
@@ -103,7 +104,7 @@ class BaselineTest extends TestCase
         $response->assertOk()->assertJson(['sufficient' => false]);
     }
 
-    /** @test */
+    #[Test]
     public function other_user_cannot_access_baseline_of_foreign_child()
     {
         $owner = User::factory()->create();
