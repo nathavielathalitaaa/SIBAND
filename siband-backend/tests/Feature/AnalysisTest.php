@@ -46,6 +46,7 @@ class AnalysisTest extends TestCase
         }
     }
 
+    #[Test]
     public function test_1_other_user_cannot_access_analysis_of_foreign_child(): void
     {
         $owner = User::factory()->create();
@@ -57,6 +58,7 @@ class AnalysisTest extends TestCase
             ->assertStatus(404);
     }
 
+    #[Test]
     public function test_2_span_greater_than_7_days_returns_422(): void
     {
         $now = Carbon::parse('2026-11-06T12:00:00Z');
@@ -73,6 +75,7 @@ class AnalysisTest extends TestCase
             ->assertStatus(422);
     }
 
+    #[Test]
     public function test_3_insufficient_baseline_returns_empty_episodes_and_patterns_but_fills_series_and_quality(): void
     {
         $now = Carbon::parse('2026-11-06T10:00:00Z');
@@ -124,6 +127,7 @@ class AnalysisTest extends TestCase
         $this->assertSame('belum_ada_baseline', $data['current']['status']);
     }
 
+    #[Test]
     public function test_4_detects_single_episode_with_correct_peak_and_delta(): void
     {
         $now = Carbon::parse('2026-11-06T12:00:00Z');
@@ -160,6 +164,7 @@ class AnalysisTest extends TestCase
         $this->assertFalse($episodes[0]['has_sensor_gap']);
     }
 
+    #[Test]
     public function test_5_samples_below_40_and_above_200_are_ignored(): void
     {
         $now = Carbon::parse('2026-11-06T12:00:00Z');
@@ -187,6 +192,7 @@ class AnalysisTest extends TestCase
         $this->assertSame(2, $data['quality']['sample_count']);
     }
 
+    #[Test]
     public function test_6_episode_crossing_sensor_gap_sets_has_sensor_gap_true(): void
     {
         $now = Carbon::parse('2026-11-06T12:00:00Z');
@@ -215,6 +221,7 @@ class AnalysisTest extends TestCase
         $this->assertSame(118, $episodes[0]['peak_bpm']);
     }
 
+    #[Test]
     public function test_7_sensor_gap_is_not_interpolated_in_series(): void
     {
         $now = Carbon::parse('2026-11-06T12:00:00Z');
@@ -241,6 +248,7 @@ class AnalysisTest extends TestCase
         $this->assertSame(300, $data['sensor_gaps'][0]['duration_seconds']);
     }
 
+    #[Test]
     public function test_8_samples_after_aktivitas_fisik_note_do_not_form_episode(): void
     {
         $now = Carbon::parse('2026-11-06T12:00:00Z');
@@ -270,6 +278,7 @@ class AnalysisTest extends TestCase
         $this->assertSame([], $response->json('episodes'));
     }
 
+    #[Test]
     public function test_9_suara_keras_and_meltdown_notes_do_not_exclude_episodes(): void
     {
         $now = Carbon::parse('2026-11-06T12:00:00Z');
@@ -300,6 +309,7 @@ class AnalysisTest extends TestCase
         $this->assertSame('suara_keras', $episodes[0]['note']['type']);
     }
 
+    #[Test]
     public function test_10_matches_closest_note_within_5_minutes_with_tie_breaker_and_null_when_none(): void
     {
         $now = Carbon::parse('2026-11-06T14:00:00Z');
@@ -350,6 +360,7 @@ class AnalysisTest extends TestCase
         $this->assertNull($episodes[1]['note']);
     }
 
+    #[Test]
     public function test_11_patterns_hourly_always_returns_24_entries_and_counts_episodes_accurately(): void
     {
         $now = Carbon::parse('2026-11-06T16:00:00Z');
@@ -388,6 +399,7 @@ class AnalysisTest extends TestCase
         $this->assertSame(0, $hourly[0]['episode_count']);
     }
 
+    #[Test]
     public function test_12_patterns_by_note_type_marks_enough_false_when_notes_under_5_and_true_when_5(): void
     {
         $now = Carbon::parse('2026-11-06T18:00:00Z');
@@ -427,6 +439,7 @@ class AnalysisTest extends TestCase
         $this->assertSame(30, $byType['suara_keras']['avg_rise_bpm']); // 110 - 80
     }
 
+    #[Test]
     public function test_13_quality_coverage_and_gap_count_match_manual_calculation(): void
     {
         $now = Carbon::parse('2026-11-06T10:00:00Z');
@@ -465,6 +478,7 @@ class AnalysisTest extends TestCase
         $this->assertEquals(30.0, $quality['per_hour'][9]['coverage_percent']);
     }
 
+    #[Test]
     public function test_14_current_measurement_state_for_three_conditions(): void
     {
         $now = Carbon::parse('2026-11-06T12:00:00Z');
@@ -511,6 +525,7 @@ class AnalysisTest extends TestCase
         $this->assertSame('tidak_ada_data', $res3->json('current.measurement_state'));
     }
 
+    #[Test]
     public function test_15_existing_routes_still_exist_and_response_contains_no_forbidden_words(): void
     {
         $uris = collect(Route::getRoutes()->getRoutes())->map(fn ($r) => $r->uri())->values()->all();
@@ -535,5 +550,132 @@ class AnalysisTest extends TestCase
         $this->assertStringNotContainsString('emosi', $rawContent);
         $this->assertStringNotContainsString('cemas', $rawContent);
         $this->assertStringNotContainsString('prediksi', $rawContent);
+    }
+
+    #[Test]
+    public function test_16_episode_at_0030_utc_with_jakarta_tz_falls_into_hour_7(): void
+    {
+        $now = Carbon::parse('2026-11-06T03:00:00Z'); // 10:00 in Asia/Jakarta
+        Carbon::setTestNow($now);
+
+        $user = User::factory()->create();
+        $child = Child::factory()->create(['user_id' => $user->id]);
+        $this->seedSufficientBaseline($user, $child, $now);
+
+        // Episode at 00:30 UTC -> 07:30 in Asia/Jakarta (+07:00)
+        $epStart = Carbon::parse('2026-11-06T00:30:00Z');
+        HeartRateLog::create(['user_id' => $user->id, 'child_id' => $child->id, 'bpm' => 112, 'recorded_at' => $epStart]);
+        HeartRateLog::create(['user_id' => $user->id, 'child_id' => $child->id, 'bpm' => 120, 'recorded_at' => $epStart->copy()->addMinutes(2)]);
+        HeartRateLog::create(['user_id' => $user->id, 'child_id' => $child->id, 'bpm' => 115, 'recorded_at' => $epStart->copy()->addMinutes(3)]);
+        HeartRateLog::create(['user_id' => $user->id, 'child_id' => $child->id, 'bpm' => 80, 'recorded_at' => $epStart->copy()->addMinutes(4)]);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->getJson("/api/children/{$child->id}/analysis?tz=Asia/Jakarta")
+            ->assertOk();
+
+        $hourly = $response->json('patterns.hourly');
+        $perHourQuality = $response->json('quality.per_hour');
+
+        $this->assertSame(7, $hourly[7]['hour']);
+        $this->assertSame(1, $hourly[7]['episode_count']);
+        $this->assertSame(0, $hourly[0]['episode_count']);
+
+        $this->assertGreaterThan(0, $perHourQuality[7]['coverage_percent']);
+        $this->assertEquals(0.0, $perHourQuality[0]['coverage_percent']);
+    }
+
+    #[Test]
+    public function test_17_default_window_follows_requested_tz_and_respects_explicit_offset_bounds(): void
+    {
+        // 2026-11-06T18:30:00Z is 2026-11-07T01:30:00+07:00 in Asia/Jakarta
+        $now = Carbon::parse('2026-11-06T18:30:00Z');
+        Carbon::setTestNow($now);
+
+        $user = User::factory()->create();
+        $child = Child::factory()->create(['user_id' => $user->id]);
+
+        // 1. Default window with tz=Asia/Jakarta -> today 00:00 in Jakarta is 2026-11-07T00:00:00+07:00
+        $resJakarta = $this->actingAs($user, 'sanctum')
+            ->getJson("/api/children/{$child->id}/analysis?tz=Asia/Jakarta")
+            ->assertOk();
+
+        $this->assertSame('Asia/Jakarta', $resJakarta->json('window.timezone'));
+        $this->assertSame('2026-11-07T00:00:00+07:00', $resJakarta->json('window.from'));
+        $this->assertSame('2026-11-07T01:30:00+07:00', $resJakarta->json('window.to'));
+
+        // 2. Default window with tz=UTC -> today 00:00 in UTC is 2026-11-06T00:00:00+00:00
+        $resUtc = $this->actingAs($user, 'sanctum')
+            ->getJson("/api/children/{$child->id}/analysis?tz=UTC")
+            ->assertOk();
+
+        $this->assertSame('UTC', $resUtc->json('window.timezone'));
+        $this->assertSame('2026-11-06T00:00:00+00:00', $resUtc->json('window.from'));
+        $this->assertSame('2026-11-06T18:30:00+00:00', $resUtc->json('window.to'));
+
+        // 3. Explicit from/to with offset (+00:00) respected and converted to tz offset (+07:00)
+        $fromExplicit = urlencode('2026-11-06T01:00:00+00:00');
+        $toExplicit = urlencode('2026-11-06T05:00:00+00:00');
+        $resExplicit = $this->actingAs($user, 'sanctum')
+            ->getJson("/api/children/{$child->id}/analysis?tz=Asia/Jakarta&from={$fromExplicit}&to={$toExplicit}")
+            ->assertOk();
+
+        $this->assertSame('2026-11-06T08:00:00+07:00', $resExplicit->json('window.from'));
+        $this->assertSame('2026-11-06T12:00:00+07:00', $resExplicit->json('window.to'));
+    }
+
+    #[Test]
+    public function test_18_invalid_tz_returns_422(): void
+    {
+        $user = User::factory()->create();
+        $child = Child::factory()->create(['user_id' => $user->id]);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson("/api/children/{$child->id}/analysis?tz=Bukan/Timezone")
+            ->assertStatus(422);
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson("/api/children/{$child->id}/analysis?tz=WIB")
+            ->assertStatus(422);
+    }
+
+    #[Test]
+    public function test_19_omitted_tz_uses_default_config_and_all_response_timestamps_carry_tz_offset(): void
+    {
+        $now = Carbon::parse('2026-11-06T05:00:00Z'); // 12:00:00+07:00 in Asia/Jakarta
+        Carbon::setTestNow($now);
+
+        $user = User::factory()->create();
+        $child = Child::factory()->create(['user_id' => $user->id]);
+        $this->seedSufficientBaseline($user, $child, $now);
+
+        // Episode at 02:00:00Z (09:00:00+07:00) to 02:03:00Z (09:03:00+07:00), followed by sensor gap to 02:10:00Z
+        $t0 = Carbon::parse('2026-11-06T02:00:00Z');
+        EventNote::create([
+            'child_id' => $child->id,
+            'type' => EventNote::TYPE_SUARA_KERAS,
+            'note' => 'Suara keras pagi hari',
+            'occurred_at' => $t0,
+        ]);
+        HeartRateLog::create(['user_id' => $user->id, 'child_id' => $child->id, 'bpm' => 115, 'recorded_at' => $t0]);
+        HeartRateLog::create(['user_id' => $user->id, 'child_id' => $child->id, 'bpm' => 122, 'recorded_at' => $t0->copy()->addMinutes(3)]);
+        HeartRateLog::create(['user_id' => $user->id, 'child_id' => $child->id, 'bpm' => 82, 'recorded_at' => $t0->copy()->addMinutes(10)]);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->getJson("/api/children/{$child->id}/analysis")
+            ->assertOk();
+
+        $data = $response->json();
+
+        $this->assertSame('Asia/Jakarta', $data['window']['timezone']);
+        $this->assertStringEndsWith('+07:00', $data['window']['from']);
+        $this->assertStringEndsWith('+07:00', $data['window']['to']);
+        $this->assertStringEndsWith('+07:00', $data['current']['recorded_at']);
+        $this->assertStringEndsWith('+07:00', $data['series'][0]['t']);
+        $this->assertStringEndsWith('+07:00', $data['sensor_gaps'][0]['from']);
+        $this->assertStringEndsWith('+07:00', $data['sensor_gaps'][0]['to']);
+        $this->assertStringEndsWith('+07:00', $data['notes'][0]['at']);
+        $this->assertStringEndsWith('+07:00', $data['episodes'][0]['start']);
+        $this->assertStringEndsWith('+07:00', $data['episodes'][0]['end']);
+        $this->assertStringEndsWith('+07:00', $data['episodes'][0]['note']['at']);
     }
 }
