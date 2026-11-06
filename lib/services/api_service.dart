@@ -349,6 +349,84 @@ class ApiService {
     }
   }
 
+  /// Ambil daftar catatan kejadian anak (GET /api/children/{child}/event-notes).
+  Future<List<Map<String, dynamic>>> getEventNotes(int childId) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null || token.isEmpty) {
+        throw Exception('Unauthenticated');
+      }
+
+      final baseUrl = await _configService.getBaseUrl();
+      final url = Uri.parse('$baseUrl/children/$childId/event-notes');
+
+      final response = await _client.get(
+        url,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.cast<Map<String, dynamic>>();
+      } else if (response.statusCode == 401) {
+        throw Exception('Unauthenticated');
+      } else {
+        throw Exception('Server mengembalikan status ${response.statusCode}');
+      }
+    } on TimeoutException {
+      throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
+    } on SocketException {
+      throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
+    } catch (e) {
+      if (e is http.ClientException || e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
+        throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
+      }
+      debugPrint('[ApiService] Error fetching event notes: $e');
+      rethrow;
+    }
+  }
+
+  /// Hapus catatan kejadian (DELETE /api/event-notes/{id}).
+  Future<bool> deleteEventNote(int noteId) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null || token.isEmpty) {
+        throw Exception('Unauthenticated');
+      }
+
+      final baseUrl = await _configService.getBaseUrl();
+      final url = Uri.parse('$baseUrl/event-notes/$noteId');
+
+      final response = await _client.delete(
+        url,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        return true;
+      } else if (response.statusCode == 401) {
+        throw Exception('Unauthenticated');
+      }
+      return false;
+    } on TimeoutException {
+      throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
+    } on SocketException {
+      throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
+    } catch (e) {
+      if (e is http.ClientException || e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
+        throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
+      }
+      debugPrint('[ApiService] Error deleting event note: $e');
+      rethrow;
+    }
+  }
+
   /// Ambil rekap bulanan anak (GET /api/children/{child}/recap).
   Future<Map<String, dynamic>?> getRecap(int childId, {String? month}) async {
     try {

@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../models/child_model.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/heart_rate_service.dart';
 import 'bpm_dashboard_screen.dart' hide Mode, HrSensorStatus;
+import 'help_screen.dart';
+import 'journal_privacy_screen.dart';
 import 'manage_children_screen.dart';
 import 'onboarding_screen.dart';
 import 'pair_device_screen.dart';
+import 'placeholder_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback? onChildrenChanged;
@@ -25,13 +30,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final AuthService _authService = AuthService();
   final HeartRateService _hrService = HeartRateService.instance;
 
+  static const String activeChildIdKey = 'active_child_id';
+
   String _userName = 'Memuat...';
   String _userEmail = '';
+  ChildModel? _activeChild;
 
   @override
   void initState() {
     super.initState();
     _fetchUserData();
+    _fetchActiveChild();
     _hrService.addListener(_onHrChanged);
   }
 
@@ -43,6 +52,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void dispose() {
     _hrService.removeListener(_onHrChanged);
     super.dispose();
+  }
+
+  Future<void> _fetchActiveChild() async {
+    try {
+      final list = await _apiService.getChildren();
+      if (!mounted) return;
+      final prefs = await SharedPreferences.getInstance();
+      final savedChildId = prefs.getInt(activeChildIdKey);
+
+      ChildModel? selectedChild;
+      if (list.isNotEmpty) {
+        if (savedChildId != null) {
+          selectedChild = list.firstWhere(
+            (c) => c.id == savedChildId,
+            orElse: () => list.first,
+          );
+        } else {
+          selectedChild = list.first;
+        }
+        await prefs.setInt(activeChildIdKey, selectedChild.id);
+        _hrService.setActiveChild(selectedChild.id);
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _activeChild = selectedChild;
+      });
+    } catch (_) {}
   }
 
   Future<void> _fetchUserData() async {
@@ -63,6 +100,218 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _userName = 'Orang Tua';
       });
     }
+  }
+
+  Future<void> _showEditProfileSheet() async {
+    final activeChild = _activeChild;
+    final nicknameController = TextEditingController(text: activeChild?.nickname ?? '');
+    final birthYearController = TextEditingController(
+      text: activeChild != null ? activeChild.birthYear.toString() : '',
+    );
+    final formKey = GlobalKey<FormState>();
+    bool isSaving = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (sheetCtx, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 24,
+              ),
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Edit profil',
+                        style: GoogleFonts.inter(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF1E2A24),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: nicknameController,
+                        decoration: InputDecoration(
+                          labelText: 'Nama panggilan',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        validator: (value) {
+                          final trimmed = value?.trim() ?? '';
+                          if (trimmed.isEmpty) {
+                            return 'Nama tidak boleh kosong';
+                          }
+                          if (trimmed.length > 255) {
+                            return 'Nama maksimal 255 karakter';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: birthYearController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: 'Tahun lahir',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        validator: (value) {
+                          final trimmed = value?.trim() ?? '';
+                          if (trimmed.isEmpty) {
+                            return 'Tahun lahir tidak boleh kosong';
+                          }
+                          final year = int.tryParse(trimmed);
+                          final currentYear = DateTime.now().year;
+                          if (year == null || year < 1900 || year > currentYear) {
+                            return 'Masukkan tahun yang valid';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          onPressed: () async {
+                            Navigator.pop(ctx);
+                            if (!mounted) return;
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ManageChildrenScreen(
+                                  onChildrenUpdated: () {
+                                    _fetchActiveChild();
+                                    widget.onChildrenChanged?.call();
+                                  },
+                                ),
+                              ),
+                            );
+                            await _fetchActiveChild();
+                            widget.onChildrenChanged?.call();
+                          },
+                          child: Text(
+                            'Kelola anak',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF1F5C4A),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: isSaving ? null : () => Navigator.pop(ctx),
+                            child: Text(
+                              'Batal',
+                              style: GoogleFonts.inter(color: const Color(0xFF6F7B74)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: isSaving
+                                ? null
+                                : () async {
+                                    if (!formKey.currentState!.validate()) return;
+                                    if (activeChild == null) return;
+                                    setSheetState(() {
+                                      isSaving = true;
+                                    });
+                                    final nickname = nicknameController.text.trim();
+                                    final birthYear = int.parse(birthYearController.text.trim());
+                                    final navigator = Navigator.of(ctx);
+                                    final messenger = ScaffoldMessenger.of(context);
+
+                                    final updated = await _apiService.updateChild(
+                                      id: activeChild.id,
+                                      nickname: nickname,
+                                      birthYear: birthYear,
+                                    );
+                                    navigator.pop();
+                                    if (!mounted) return;
+                                    if (updated != null) {
+                                      setState(() {
+                                        _activeChild = updated;
+                                      });
+                                      await _fetchActiveChild();
+                                      widget.onChildrenChanged?.call();
+                                      if (!mounted) return;
+                                      messenger.showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Profil anak berhasil diperbarui'),
+                                          backgroundColor: Color(0xFF1F5C4A),
+                                        ),
+                                      );
+                                    } else {
+                                      messenger.showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Gagal memperbarui profil anak'),
+                                          backgroundColor: Colors.redAccent,
+                                        ),
+                                      );
+                                    }
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF1F5C4A),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: isSaving
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Text('Simpan'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _handleDataSourceSelection() async {
@@ -157,6 +406,212 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _openDeviceAndDataSourceSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (sheetCtx, setSheetState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Perangkat & sumber data',
+                      style: GoogleFonts.inter(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF1E2A24),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE3EEDF),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.sensors_rounded, color: Color(0xFF1F5C4A), size: 20),
+                      ),
+                      title: Text(
+                        'Sumber data',
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF1E2A24),
+                        ),
+                      ),
+                      subtitle: Text(
+                        _hrService.currentMode == Mode.dummy ? 'Mode Dummy' : 'BLE Asli',
+                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF6F7B74)),
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF6F7B74)),
+                      onTap: () async {
+                        await _handleDataSourceSelection();
+                        if (sheetCtx.mounted) setSheetState(() {});
+                        if (mounted) setState(() {});
+                      },
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE3EEDF),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.watch_rounded, color: Color(0xFF1F5C4A), size: 20),
+                      ),
+                      title: Text(
+                        'Pasang jam',
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF1E2A24),
+                        ),
+                      ),
+                      subtitle: Text(
+                        _hrService.pairedDeviceName != null
+                            ? _hrService.pairedDeviceName!
+                            : 'Belum ada jam terpasang',
+                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF6F7B74)),
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF6F7B74)),
+                      onTap: () async {
+                        Navigator.pop(ctx);
+                        if (!mounted) return;
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PairDeviceScreen(
+                              childId: _activeChild?.id,
+                              childNickname: _activeChild?.nickname,
+                            ),
+                          ),
+                        );
+                        if (mounted) setState(() {});
+                      },
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE3EEDF),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.developer_board_rounded, color: Color(0xFF1F5C4A), size: 20),
+                      ),
+                      title: Text(
+                        'Layar teknis (lama)',
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF1E2A24),
+                        ),
+                      ),
+                      subtitle: Text(
+                        'BpmDashboardScreen lama untuk pengujian BLE langsung',
+                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF6F7B74)),
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF6F7B74)),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        if (!mounted) return;
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const BpmDashboardScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildPreferenceCard({
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return Semantics(
+      label: title,
+      button: true,
+      child: Container(
+        height: 56,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF1E2A24),
+                      ),
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: Color(0xFF6F7B74),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
 
   Future<void> _handleLogout() async {
     final confirmed = await showDialog<bool>(
@@ -197,6 +652,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final childName = _activeChild != null && _activeChild!.nickname.isNotEmpty
+        ? _activeChild!.nickname
+        : _userName;
+    final initial = childName.trim().isNotEmpty
+        ? childName.trim()[0].toUpperCase()
+        : '?';
+    final subtitleText = _activeChild != null
+        ? '${DateTime.now().year - _activeChild!.birthYear} tahun'
+        : _userEmail;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F4EF),
       appBar: AppBar(
@@ -216,7 +681,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         child: Column(
           children: [
-            // User Card
+            // Active Child Card
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -231,18 +696,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Container(
-                    width: 56,
-                    height: 56,
+                    width: 72,
+                    height: 72,
+                    alignment: Alignment.center,
                     decoration: const BoxDecoration(
                       color: Color(0xFFE3EEDF),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
-                      Icons.person_rounded,
-                      size: 32,
-                      color: Color(0xFF1F5C4A),
+                    child: Text(
+                      initial,
+                      style: GoogleFonts.inter(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF1F5C4A),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -251,17 +721,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _userName,
+                          childName.toUpperCase(),
                           style: GoogleFonts.inter(
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.w600,
                             color: const Color(0xFF1E2A24),
                           ),
                         ),
-                        if (_userEmail.isNotEmpty) ...[
+                        if (subtitleText.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           Text(
-                            _userEmail,
+                            subtitleText,
                             style: GoogleFonts.inter(
                               fontSize: 13,
                               color: const Color(0xFF6F7B74),
@@ -271,16 +741,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ],
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  Align(
+                    alignment: Alignment.bottomRight,
+                    child: Semantics(
+                      label: 'Edit profil',
+                      button: true,
+                      child: TextButton(
+                        onPressed: _showEditProfileSheet,
+                        style: TextButton.styleFrom(
+                          backgroundColor: const Color(0xFFE8F0E3),
+                          foregroundColor: const Color(0xFF1F5C4A),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          shape: const StadiumBorder(),
+                        ),
+                        child: Text(
+                          'Edit profil',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF1F5C4A),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 20),
 
-            // Settings Group
+            // Informasi pendamping
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Informasi pendamping',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF1E2A24),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
             Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.04),
@@ -289,147 +800,151 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ],
               ),
-              child: Material(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(20),
-                clipBehavior: Clip.antiAlias,
-                child: Column(
-                  children: [
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE3EEDF),
-                        borderRadius: BorderRadius.circular(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Nama orang tua/wali',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: const Color(0xFF6F7B74),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _userName,
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1E2A24),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Divider(height: 1),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Email akun',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: const Color(0xFF6F7B74),
+                        ),
                       ),
-                      child: const Icon(Icons.child_care_rounded, color: Color(0xFF1F5C4A), size: 20),
-                    ),
-                    title: Text(
-                      'Kelola anak',
-                      style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500, color: const Color(0xFF1E2A24)),
-                    ),
-                    subtitle: Text(
-                      'Daftar, tambah, ubah, dan hapus profil anak',
-                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF6F7B74)),
-                    ),
-                    trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF6F7B74)),
-                    onTap: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ManageChildrenScreen(
-                            onChildrenUpdated: widget.onChildrenChanged,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _userEmail.isNotEmpty ? _userEmail : '-',
+                          textAlign: TextAlign.right,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF1E2A24),
                           ),
                         ),
-                      );
-                      widget.onChildrenChanged?.call();
-                    },
-                  ),
-                  const Divider(height: 1, indent: 64, endIndent: 20),
-
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE3EEDF),
-                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.sensors_rounded, color: Color(0xFF1F5C4A), size: 20),
-                    ),
-                    title: Text(
-                      'Sumber data',
-                      style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500, color: const Color(0xFF1E2A24)),
-                    ),
-                    subtitle: Text(
-                      _hrService.currentMode == Mode.dummy ? 'Mode Dummy' : 'BLE Asli',
-                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF6F7B74)),
-                    ),
-                    trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF6F7B74)),
-                    onTap: _handleDataSourceSelection,
-                  ),
-                  const Divider(height: 1, indent: 64, endIndent: 20),
-
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE3EEDF),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.watch_rounded, color: Color(0xFF1F5C4A), size: 20),
-                    ),
-                    title: Text(
-                      'Jam terpasang',
-                      style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500, color: const Color(0xFF1E2A24)),
-                    ),
-                    subtitle: Text(
-                      _hrService.pairedDeviceName != null
-                          ? _hrService.pairedDeviceName!
-                          : 'Belum ada jam terpasang',
-                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF6F7B74)),
-                    ),
-                    trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF6F7B74)),
-                    onTap: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const PairDeviceScreen(),
-                        ),
-                      );
-                      if (mounted) setState(() {});
-                    },
-                  ),
-                  const Divider(height: 1, indent: 64, endIndent: 20),
-
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE3EEDF),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.developer_board_rounded, color: Color(0xFF1F5C4A), size: 20),
-                    ),
-                    title: Text(
-                      'Layar teknis (lama)',
-                      style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500, color: const Color(0xFF1E2A24)),
-                    ),
-                    subtitle: Text(
-                      'BpmDashboardScreen lama untuk pengujian BLE langsung',
-                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF6F7B74)),
-                    ),
-                    trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF6F7B74)),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const BpmDashboardScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  const Divider(height: 1, indent: 64, endIndent: 20),
-
-                  ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.logout_rounded, color: Colors.redAccent, size: 20),
-                    ),
-                    title: Text(
-                      'Keluar',
-                      style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500, color: Colors.redAccent),
-                    ),
-                    trailing: const Icon(Icons.chevron_right_rounded, color: Colors.redAccent),
-                    onTap: _handleLogout,
+                    ],
                   ),
                 ],
               ),
             ),
+            const SizedBox(height: 20),
+
+            // Preferensi pendampingan
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Preferensi pendampingan',
+                style: GoogleFonts.inter(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF1E2A24),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _buildPreferenceCard(
+              title: 'Jurnal harian & pengaturan privasi',
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => JournalPrivacyScreen(
+                      initialChild: _activeChild,
+                      onChildrenChanged: () {
+                        _fetchActiveChild();
+                        widget.onChildrenChanged?.call();
+                      },
+                    ),
+                  ),
+                );
+                await _fetchActiveChild();
+                widget.onChildrenChanged?.call();
+              },
+            ),
+            const SizedBox(height: 10),
+            _buildPreferenceCard(
+              title: 'Pengingat jurnal & zona aman',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PlaceholderScreen(
+                      title: 'Segera hadir',
+                      message: 'Pengingat dan zona aman belum tersedia pada prototipe.',
+                      icon: Icons.notifications_active_outlined,
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+            _buildPreferenceCard(
+              title: 'Bantuan dan dukungan',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const HelpScreen(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+            _buildPreferenceCard(
+              title: 'Perangkat & sumber data',
+              onTap: _openDeviceAndDataSourceSheet,
+            ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: Semantics(
+              label: 'Keluar',
+              button: true,
+              child: ElevatedButton(
+                onPressed: _handleLogout,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD01A10),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  'Keluar',
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
           ),
+          const SizedBox(height: 12),
           ],
         ),
       ),
