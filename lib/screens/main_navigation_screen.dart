@@ -116,7 +116,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     child: InkWell(
                       borderRadius: BorderRadius.circular(20),
                       onTap: () => _onTabSelected(index),
-                      child: Center(
+                      child: Center(heightFactor: 1,
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           padding: EdgeInsets.symmetric(
