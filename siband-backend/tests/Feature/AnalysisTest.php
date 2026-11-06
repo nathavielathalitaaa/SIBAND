@@ -9,6 +9,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AnalysisTest extends TestCase
@@ -374,7 +375,7 @@ class AnalysisTest extends TestCase
         HeartRateLog::create(['user_id' => $user->id, 'child_id' => $child->id, 'bpm' => 116, 'recorded_at' => $t14->copy()->addMinutes(3)]);
 
         $response = $this->actingAs($user, 'sanctum')
-            ->getJson("/api/children/{$child->id}/analysis");
+            ->getJson("/api/children/{$child->id}/analysis?tz=UTC");
 
         $response->assertOk();
         $hourly = $response->json('patterns.hourly');
@@ -410,7 +411,7 @@ class AnalysisTest extends TestCase
         }
 
         $response = $this->actingAs($user, 'sanctum')
-            ->getJson("/api/children/{$child->id}/analysis");
+            ->getJson("/api/children/{$child->id}/analysis?tz=UTC");
 
         $response->assertOk();
         $byType = collect($response->json('patterns.by_note_type'))->keyBy('type');
@@ -449,7 +450,7 @@ class AnalysisTest extends TestCase
         HeartRateLog::create(['user_id' => $user->id, 'child_id' => $child->id, 'bpm' => 83, 'recorded_at' => $from->copy()->addMinutes(8)]);
 
         $response = $this->actingAs($user, 'sanctum')
-            ->getJson('/api/children/' . $child->id . '/analysis?from=' . urlencode($from->toIso8601String()) . '&to=' . urlencode($to->toIso8601String()));
+            ->getJson('/api/children/' . $child->id . '/analysis?tz=UTC&from=' . urlencode($from->toIso8601String()) . '&to=' . urlencode($to->toIso8601String()));
 
         $response->assertOk();
         $quality = $response->json('quality');

@@ -24,13 +24,16 @@ class AnalysisService
     /**
      * Compute comprehensive heart-rate and event-note analysis for a child within [from, to].
      */
-    public function analyze(Child $child, Carbon $from, Carbon $to): array
+    public function analyze(Child $child, Carbon $from, Carbon $to, ?string $tz = null): array
     {
-        $tz = config('app.timezone', 'UTC');
+        $tz = $tz ?? (string) config('analysis.default_timezone', 'Asia/Jakarta');
+        $appTz = (string) config('app.timezone', 'UTC');
         $now = Carbon::now($tz);
 
         $fromLocal = $from->copy()->setTimezone($tz);
         $toLocal = $to->copy()->setTimezone($tz);
+        $fromDb = $fromLocal->copy()->setTimezone($appTz);
+        $toDb = $toLocal->copy()->setTimezone($appTz);
 
         $gapMinSeconds = (int) config('analysis.gap_min_seconds', 150);
         $staleAfterSeconds = (int) config('analysis.stale_after_seconds', 420);
@@ -46,7 +49,7 @@ class AnalysisService
         // 1. Valid samples within window (BPM 40-200), ordered by recorded_at
         $samples = HeartRateLog::where('child_id', $child->id)
             ->whereBetween('bpm', [self::MIN_VALID_BPM, self::MAX_VALID_BPM])
-            ->whereBetween('recorded_at', [$fromLocal, $toLocal])
+            ->whereBetween('recorded_at', [$fromDb, $toDb])
             ->orderBy('recorded_at')
             ->orderBy('id')
             ->get();
@@ -120,10 +123,10 @@ class AnalysisService
         }
 
         // Fetch notes in window (and slightly before window for aktivitas_fisik / episode matching)
-        $lookbackStart = $fromLocal->copy()->subSeconds(max($noteMatchSeconds, 600));
-        $lookaheadEnd = $toLocal->copy()->addSeconds($noteMatchSeconds);
+        $lookbackStartDb = $fromDb->copy()->subSeconds(max($noteMatchSeconds, 600));
+        $lookaheadEndDb = $toDb->copy()->addSeconds($noteMatchSeconds);
         $extendedNotes = EventNote::where('child_id', $child->id)
-            ->whereBetween('occurred_at', [$lookbackStart, $lookaheadEnd])
+            ->whereBetween('occurred_at', [$lookbackStartDb, $lookaheadEndDb])
             ->orderBy('occurred_at')
             ->orderBy('id')
             ->get();
@@ -222,7 +225,7 @@ class AnalysisService
             // Fetch valid samples up to toLocal + patternWindowSeconds for notes near the end of window
             $samplesForPatterns = HeartRateLog::where('child_id', $child->id)
                 ->whereBetween('bpm', [self::MIN_VALID_BPM, self::MAX_VALID_BPM])
-                ->whereBetween('recorded_at', [$fromLocal, $toLocal->copy()->addSeconds($patternWindowSeconds)])
+                ->whereBetween('recorded_at', [$fromDb, $toDb->copy()->addSeconds($patternWindowSeconds)])
                 ->orderBy('recorded_at')
                 ->get();
 
@@ -295,6 +298,7 @@ class AnalysisService
         // 13. meta
         $metaPayload = [
             'parameters' => [
+                'default_timezone' => (string) config('analysis.default_timezone', 'Asia/Jakarta'),
                 'gap_min_seconds' => $gapMinSeconds,
                 'stale_after_seconds' => $staleAfterSeconds,
                 'expected_rest_seconds' => $expectedRestSeconds,

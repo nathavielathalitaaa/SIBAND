@@ -24,7 +24,17 @@ class AnalysisController extends Controller
     {
         $childModel = $request->user()->children()->findOrFail($child);
 
-        $tz = config('app.timezone', 'UTC');
+        $defaultTz = (string) config('analysis.default_timezone', 'Asia/Jakarta');
+        $tzParam = $request->query('tz');
+        $tz = ($tzParam !== null && $tzParam !== '') ? $tzParam : $defaultTz;
+
+        if (!is_string($tz) || !in_array($tz, \DateTimeZone::listIdentifiers(), true)) {
+            return response()->json([
+                'message' => 'Parameter tz tidak valid.',
+                'errors' => ['tz' => ['Timezone harus berupa identifier IANA yang valid.']],
+            ], 422);
+        }
+
         $now = Carbon::now($tz);
         $maxSpanDays = (int) config('analysis.max_span_days', 7);
         $maxSpanSeconds = $maxSpanDays * 86400;
@@ -34,7 +44,7 @@ class AnalysisController extends Controller
 
         try {
             $from = $fromParam !== null && $fromParam !== ''
-                ? Carbon::parse($fromParam)->setTimezone($tz)
+                ? Carbon::parse($fromParam, $tz)->setTimezone($tz)
                 : $now->copy()->startOfDay();
         } catch (\Exception $e) {
             return response()->json([
@@ -45,7 +55,7 @@ class AnalysisController extends Controller
 
         try {
             $to = $toParam !== null && $toParam !== ''
-                ? Carbon::parse($toParam)->setTimezone($tz)
+                ? Carbon::parse($toParam, $tz)->setTimezone($tz)
                 : $now->copy();
         } catch (\Exception $e) {
             return response()->json([
@@ -73,7 +83,7 @@ class AnalysisController extends Controller
             ], 422);
         }
 
-        $result = $this->analysisService->analyze($childModel, $from, $to);
+        $result = $this->analysisService->analyze($childModel, $from, $to, $tz);
 
         return response()->json($result);
     }

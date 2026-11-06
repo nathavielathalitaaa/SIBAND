@@ -1,6 +1,9 @@
 <?php
 
 return [
+    // Timezone default untuk jendela analisis dan pengelompokan jam lokal (IANA timezone)
+    'default_timezone' => 'Asia/Jakarta',
+
     // Nilai sementara (pengamatan awal, belum terbukti secara klinis/empiris):
 
     // Selisih antar sampel di atas nilai ini dianggap jeda sensor (detik)
