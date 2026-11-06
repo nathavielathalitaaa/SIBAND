@@ -123,7 +123,7 @@ class AnalysisService
         }
 
         // Fetch notes in window (and slightly before window for aktivitas_fisik / episode matching)
-        $lookbackStartDb = $fromDb->copy()->subSeconds(max($noteMatchSeconds, 600));
+        $lookbackStartDb = $fromDb->copy()->subSeconds(max($noteMatchSeconds, 1800));
         $lookaheadEndDb = $toDb->copy()->addSeconds($noteMatchSeconds);
         $extendedNotes = EventNote::where('child_id', $child->id)
             ->whereBetween('occurred_at', [$lookbackStartDb, $lookaheadEndDb])
