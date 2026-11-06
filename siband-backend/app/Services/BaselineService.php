@@ -36,14 +36,7 @@ class BaselineService
 
         $excludedCount = 0;
         $filtered = $logs->filter(function ($log) use ($eventNotes) {
-            foreach ($eventNotes as $note) {
-                $noteTime = Carbon::parse($note->occurred_at);
-                $logTime = Carbon::parse($log->recorded_at);
-                if ($logTime->greaterThanOrEqualTo($noteTime) && $logTime->lessThanOrEqualTo($noteTime->copy()->addMinutes(10))) {
-                    return false; // exclude
-                }
-            }
-            return true; // keep
+            return !$this->isWithinNoteExclusionWindow(Carbon::parse($log->recorded_at), $eventNotes);
         });
 
         $excludedCount = $logs->count() - $filtered->count();
@@ -74,9 +67,23 @@ class BaselineService
     }
 
     /**
+     * Check whether a sample timestamp falls within the 10-minute exclusion window after any given note.
+     */
+    public function isWithinNoteExclusionWindow(Carbon $logTime, iterable $eventNotes): bool
+    {
+        foreach ($eventNotes as $note) {
+            $noteTime = Carbon::parse($note->occurred_at);
+            if ($logTime->greaterThanOrEqualTo($noteTime) && $logTime->lessThanOrEqualTo($noteTime->copy()->addMinutes(10))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Simple percentile calculation (nearest-rank method).
      */
-    private function percentile($sortedValues, int $percent)
+    public function percentile($sortedValues, int $percent)
     {
         $count = $sortedValues->count();
         if ($count === 0) {

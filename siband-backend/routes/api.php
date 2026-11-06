@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\HeartRateController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BaselineController;
+use App\Http\Controllers\Api\AnalysisController;
 use App\Http\Controllers\Api\RecapController;
 use App\Http\Controllers\Api\ShareLinkController;
 use Illuminate\Http\Request;
@@ -39,4 +40,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Monthly recap route
     Route::get('/children/{child}/recap', [RecapController::class, 'show']);
+
+    // Analysis route
+    Route::get('/children/{child}/analysis', [AnalysisController::class, 'show']);
 });
