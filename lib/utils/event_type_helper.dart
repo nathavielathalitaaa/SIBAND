@@ -57,3 +57,21 @@ final List<Map<String, dynamic>> kEventTypes = [
     'icon': Icons.more_horiz_rounded,
   },
 ];
+
+/// Pemetaan ikon untuk tipe catatan kejadian.
+IconData getEventTypeIcon(String type) {
+  for (final item in kEventTypes) {
+    if (item['type'] == type && item['icon'] is IconData) {
+      return item['icon'] as IconData;
+    }
+  }
+  switch (type.toLowerCase()) {
+    case 'aktivitas_fisik':
+      return Icons.directions_run_rounded;
+    case 'meltdown':
+      return Icons.warning_amber_rounded;
+    default:
+      return Icons.bookmark_border_rounded;
+  }
+}
+

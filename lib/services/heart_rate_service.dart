@@ -275,6 +275,23 @@ class HeartRateService extends ChangeNotifier {
     notifyListeners();
   }
 
+  @visibleForTesting
+  void setBleTestState({
+    required Mode mode,
+    BluetoothConnectionState bleState = BluetoothConnectionState.connected,
+    int bpm = 75,
+    DateTime? lastBpmReceivedAt,
+    int secondsSinceLastBpm = 0,
+  }) {
+    _dummyTimer?.cancel();
+    _currentMode = mode;
+    _currentBleState = bleState;
+    _currentBpm = bpm;
+    _lastBpmReceivedAt = lastBpmReceivedAt;
+    _secondsSinceLastBpm = secondsSinceLastBpm;
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     _staleCheckTimer?.cancel();

@@ -273,7 +273,7 @@ void main() {
 
       // Trend card
       expect(find.text('Tren detak jantung'), findsOneWidget);
-      expect(find.text('Rata-rata per jam · bukan diagnosis'), findsOneWidget);
+      expect(find.text('Pemantauan detak jantung · bukan diagnosis'), findsOneWidget);
 
       // Event note button & warning text
       expect(find.text('+ Catatan kejadian'), findsOneWidget);
