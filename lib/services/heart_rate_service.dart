@@ -13,13 +13,20 @@ enum HrSensorStatus { measuring, resting, disconnected }
 class HeartRateService extends ChangeNotifier {
   static final HeartRateService instance = HeartRateService._internal();
 
-  HeartRateService._internal() {
+  HeartRateService._internal() : _apiService = ApiService() {
     unawaited(loadSavedDevice());
   }
 
-  final ApiService _apiService = ApiService();
+  @visibleForTesting
+  HeartRateService.forTesting({ApiService? apiService})
+      : _apiService = apiService ?? ApiService();
+
+  final ApiService _apiService;
   final BleService _bleService = BleService();
   final Random _random = Random();
+
+  // Dummy hanya untuk tampilan; kirim ke server hanya untuk uji sengaja.
+  bool sendDummyToBackend = false;
 
   Mode _currentMode = Mode.dummy;
   Mode get currentMode => _currentMode;
@@ -180,13 +187,15 @@ class HeartRateService extends ChangeNotifier {
       _secondsSinceLastBpm = 0;
       notifyListeners();
 
-      _apiService.postHeartRate(
-        bpm: nextBpm,
-        deviceName: 'XWATCH_DUMMY',
-        deviceMac: 'AA:BB:CC:DD:EE:FF',
-        childId: _activeChildId,
-        deviceId: _activeDeviceId,
-      );
+      if (sendDummyToBackend) {
+        _apiService.postHeartRate(
+          bpm: nextBpm,
+          deviceName: 'XWATCH_DUMMY',
+          deviceMac: 'AA:BB:CC:DD:EE:FF',
+          childId: _activeChildId,
+          deviceId: _activeDeviceId,
+        );
+      }
     });
   }
 
