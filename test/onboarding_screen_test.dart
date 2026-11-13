@@ -26,7 +26,7 @@ void main() {
     expect(find.text('Temani tumbuhnya,\ndengan lebih tenang.'), findsOneWidget);
     expect(
       find.text(
-        'Ruang pendamping bagi orang tua untuk memahami kebutuhan, emosi, dan keseharian anak.',
+        'Ruang pendamping bagi orang tua untuk memahami kebutuhan dan keseharian anak.',
       ),
       findsOneWidget,
     );

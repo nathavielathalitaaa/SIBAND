@@ -33,7 +33,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       eyebrow: 'SELAMAT DATANG DI SIBAND',
       title: 'Temani tumbuhnya,\ndengan lebih tenang.',
       description:
-          'Ruang pendamping bagi orang tua untuk memahami kebutuhan, emosi, dan keseharian anak.',
+          'Ruang pendamping bagi orang tua untuk memahami kebutuhan dan keseharian anak.',
     ),
     OnboardingItem(
       image: 'assets/onboarding/onboarding_2.png',
