@@ -121,7 +121,7 @@ class HelpScreen extends StatelessWidget {
                 ],
               ),
               child: Text(
-                'Siband bukan alat diagnosis dan bukan pengganti tenaga profesional. Perubahan detak jantung bukan bukti stres. Jam tangan konsumen bisa salah baca saat anak banyak bergerak. Sensor jam beristirahat sekitar 5 menit di antara pengukuran; itu normal.',
+                'Siband bukan alat diagnosis dan bukan pengganti tenaga profesional. Perubahan detak jantung bukan bukti stres. Jam tangan konsumen bisa salah baca saat anak banyak bergerak. Jam kadang beristirahat sebentar di antara pengukuran; itu normal.',
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   height: 1.5,
