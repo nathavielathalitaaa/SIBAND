@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/analysis_model.dart';
 import '../models/child_model.dart';
 import '../services/api_service.dart';
 import '../services/heart_rate_service.dart';
+import '../utils/event_type_helper.dart';
+import '../widgets/home_monitoring_chart_card.dart';
 import 'event_note_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -13,6 +17,8 @@ class HomeScreen extends StatefulWidget {
   final String? initialUserName;
   final String? initialErrorMessage;
   final Future<List<ChildModel>> Function()? onFetchChildren;
+  final AnalysisModel? initialAnalysisData;
+  final ApiService? apiService;
 
   const HomeScreen({
     super.key,
@@ -21,6 +27,8 @@ class HomeScreen extends StatefulWidget {
     this.initialUserName,
     this.initialErrorMessage,
     this.onFetchChildren,
+    this.initialAnalysisData,
+    this.apiService,
   });
 
   @override
@@ -28,7 +36,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final ApiService _apiService = ApiService();
+  late final ApiService _apiService;
   final HeartRateService _hrService = HeartRateService.instance;
 
   static const String activeChildIdKey = 'active_child_id';
@@ -36,9 +44,11 @@ class _HomeScreenState extends State<HomeScreen> {
   List<ChildModel> _children = [];
   ChildModel? _activeChild;
   bool _isLoadingChildren = true;
+  bool _isLoadingAnalysis = false;
   String? _errorMessage;
 
   String _userName = 'Orang Tua';
+  AnalysisModel? _analysisData;
   Map<String, dynamic>? _baselineData;
   List<Map<String, dynamic>> _hourlyAverages = [];
 
@@ -47,6 +57,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _apiService = widget.apiService ?? ApiService();
+    _analysisData = widget.initialAnalysisData;
+
     _hrService.start();
     _hrService.addListener(_onHeartRateUpdate);
 
@@ -80,6 +93,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialAnalysisData != oldWidget.initialAnalysisData &&
+        widget.initialAnalysisData != null) {
+      setState(() {
+        _analysisData = widget.initialAnalysisData;
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _refreshTimer?.cancel();
     _hrService.removeListener(_onHeartRateUpdate);
@@ -100,12 +124,36 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     if (widget.initialChildren == null) {
       futures.add(_fetchChildren());
-    } else if (_activeChild != null) {
-      futures.add(_fetchStatsForChild(_activeChild!.id));
+    } else {
+      futures.add(_syncActiveChildFromPrefsAndFetchStats());
     }
     if (futures.isNotEmpty) {
       await Future.wait(futures);
     }
+  }
+
+  Future<void> _syncActiveChildFromPrefsAndFetchStats() async {
+    if (_children.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    final savedChildId = prefs.getInt(activeChildIdKey);
+
+    ChildModel selected = _children.first;
+    if (savedChildId != null) {
+      selected = _children.firstWhere(
+        (c) => c.id == savedChildId,
+        orElse: () => _children.first,
+      );
+    }
+    await prefs.setInt(activeChildIdKey, selected.id);
+    _hrService.setActiveChild(selected.id);
+
+    if (mounted) {
+      setState(() {
+        _activeChild = selected;
+      });
+    }
+
+    await _fetchStatsForChild(selected.id);
   }
 
   Future<void> _retryInit() async {
@@ -168,13 +216,14 @@ class _HomeScreenState extends State<HomeScreen> {
       });
 
       if (selectedChild != null) {
-        _fetchStatsForChild(selectedChild.id);
+        await _fetchStatsForChild(selectedChild.id);
       }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _isLoadingChildren = false;
-        _errorMessage = 'Gagal memuat data anak: ${e.toString().replaceAll("Exception: ", "")}';
+        _errorMessage =
+            'Gagal memuat data anak: ${e.toString().replaceAll("Exception: ", "")}';
       });
     }
   }
@@ -188,35 +237,62 @@ class _HomeScreenState extends State<HomeScreen> {
       _activeChild = child;
     });
 
-    _fetchStatsForChild(child.id);
+    await _fetchStatsForChild(child.id);
   }
 
   Future<void> _fetchStatsForChild(int childId) async {
-    try {
-      final baselineFuture = _apiService.getBaseline(childId, days: 7);
-      final historyFuture = _apiService.getHeartRateHistory(hours: 24);
-
-      final results = await Future.wait([baselineFuture, historyFuture]);
-
-      if (!mounted) return;
-
-      final baseline = results[0] as Map<String, dynamic>?;
-      final history = results[1] as List<Map<String, dynamic>>;
-
-      // Process hourly averages for the last 7 hours that have data
-      final hourly = _computeHourlyAverages(history);
-
+    if (mounted && _analysisData == null) {
       setState(() {
-        _baselineData = baseline;
-        _hourlyAverages = hourly;
+        _isLoadingAnalysis = true;
       });
-    } catch (_) {}
+    }
+
+    AnalysisModel? fetchedAnalysis;
+    Map<String, dynamic>? fetchedBaseline;
+    List<Map<String, dynamic>> fetchedHistory = [];
+
+    await Future.wait([
+      () async {
+        try {
+          fetchedAnalysis = await _apiService.getChildAnalysis(
+            childId,
+            timezone: 'Asia/Jakarta',
+          );
+        } catch (_) {}
+      }(),
+      () async {
+        try {
+          fetchedBaseline = await _apiService.getBaseline(childId, days: 7);
+        } catch (_) {}
+      }(),
+      () async {
+        try {
+          fetchedHistory = await _apiService.getHeartRateHistory(hours: 24);
+        } catch (_) {}
+      }(),
+    ]);
+
+    if (!mounted) return;
+
+    final hourly = _computeHourlyAverages(fetchedHistory);
+
+    setState(() {
+      _isLoadingAnalysis = false;
+      if (fetchedAnalysis != null) {
+        _analysisData = fetchedAnalysis;
+      }
+      if (fetchedBaseline != null) {
+        _baselineData = fetchedBaseline;
+      }
+      _hourlyAverages = hourly;
+    });
   }
 
-  List<Map<String, dynamic>> _computeHourlyAverages(List<Map<String, dynamic>> history) {
+  List<Map<String, dynamic>> _computeHourlyAverages(
+    List<Map<String, dynamic>> history,
+  ) {
     if (history.isEmpty) return [];
 
-    // Group logs by hour
     final Map<int, List<int>> hourBuckets = {};
 
     for (final item in history) {
@@ -227,17 +303,18 @@ class _HomeScreenState extends State<HomeScreen> {
       final dt = DateTime.tryParse(recordedAtStr.toString());
       if (dt == null) continue;
 
-      // Use epoch hour key: milliseconds / 3,600,000
-      final hourKey = DateTime(dt.year, dt.month, dt.day, dt.hour).millisecondsSinceEpoch;
+      final hourKey = DateTime(
+        dt.year,
+        dt.month,
+        dt.day,
+        dt.hour,
+      ).millisecondsSinceEpoch;
       hourBuckets.putIfAbsent(hourKey, () => []).add((bpm as num).toInt());
     }
 
     if (hourBuckets.isEmpty) return [];
 
-    // Sort hour keys ascending
     final sortedKeys = hourBuckets.keys.toList()..sort();
-
-    // Take the last 7 hours
     final recentKeys = sortedKeys.length > 7
         ? sortedKeys.sublist(sortedKeys.length - 7)
         : sortedKeys;
@@ -267,6 +344,269 @@ class _HomeScreenState extends State<HomeScreen> {
       return 'Selamat Sore';
     } else {
       return 'Selamat Malam';
+    }
+  }
+
+  /// Format HH:mm dari ISO 8601 string (mempertahankan jam lokal pada offset string seperti +07:00).
+  String _formatTimeWib(String? iso) {
+    if (iso == null || iso.isEmpty) return '--:--';
+    final match = RegExp(r'T(\d{2}):(\d{2})').firstMatch(iso);
+    if (match != null) {
+      return '${match.group(1)}:${match.group(2)}';
+    }
+    final dt = DateTime.tryParse(iso);
+    if (dt != null) {
+      final wib = dt.toUtc().add(const Duration(hours: 7));
+      return '${wib.hour.toString().padLeft(2, '0')}:${wib.minute.toString().padLeft(2, '0')}';
+    }
+    return iso;
+  }
+
+  /// Format durasi detik ke teks ringkas bahasa Indonesia (mis. "6 menit").
+  String _formatDuration(int seconds) {
+    if (seconds < 60) return '$seconds detik';
+    final minutes = (seconds / 60).round();
+    return '$minutes menit';
+  }
+
+  /// Pemetaan status detak jantung sesuai tiga label utama yang disepakati & aturan backend.
+  String _resolveHeartRateStatusLabel({
+    required String? backendStatus,
+    required int? bpm,
+    required bool baselineSufficient,
+    required double? p25,
+    required double? p75,
+    required int episodeMargin,
+    bool preferDynamicBpmCalculation = false,
+  }) {
+    if (!preferDynamicBpmCalculation) {
+      if (backendStatus == 'dalam_rentang' ||
+          backendStatus == 'di_bawah_rentang') {
+        return 'Dalam rentang biasa';
+      }
+      if (backendStatus == 'sedikit_di_atas') {
+        return 'Sedikit di atas baseline';
+      }
+      if (backendStatus == 'jauh_di_atas') {
+        return 'Jauh di atas baseline';
+      }
+    }
+
+    if (baselineSufficient &&
+        bpm != null &&
+        bpm > 0 &&
+        p25 != null &&
+        p75 != null) {
+      final threshold = p75 + episodeMargin;
+      if (bpm <= p75) {
+        return 'Dalam rentang biasa';
+      } else if (bpm <= threshold) {
+        return 'Sedikit di atas baseline';
+      } else {
+        return 'Jauh di atas baseline';
+      }
+    }
+
+    if (!baselineSufficient) {
+      return 'Baseline belum cukup data';
+    }
+    return 'Belum ada pembacaan';
+  }
+
+  /// Menentukan BPM efektif, teks tampilan BPM, label badge status, dan keterangan pengukuran
+  /// dengan memprioritaskan sensor BLE live dan memisahkan mode simulasi dummy dari sensor aktual.
+  ({
+    int? effectiveBpm,
+    String bpmDisplay,
+    String statusLabel,
+    String measurementStateLabel,
+  }) _resolveCurrentMonitoringState({
+    required AnalysisCurrent? analysisCurrent,
+    required bool baselineSufficient,
+    required double? p25,
+    required double? p75,
+    required int episodeMargin,
+    required int staleAfterSeconds,
+  }) {
+    final bool isBleMode = _hrService.currentMode == Mode.ble;
+    final HrSensorStatus bleStatus = _hrService.sensorStatus;
+    final bool hasFreshLocalBleReading = _hrService.lastBpmReceivedAt != null &&
+        _hrService.currentBpm > 0 &&
+        _hrService.secondsSinceLastBpm <= staleAfterSeconds;
+
+    final bool hasBackendBpm = analysisCurrent?.bpm != null;
+    final bool isBackendStale = analysisCurrent != null &&
+        (analysisCurrent.measurementState == 'tidak_ada_data' ||
+            (analysisCurrent.ageSeconds != null &&
+                analysisCurrent.ageSeconds! > staleAfterSeconds));
+
+    // 1. Sensor BLE lokal aktif mengukur -> Prioritaskan nilai live BLE (tidak dikunci backend 30 dtk)
+    if (isBleMode &&
+        bleStatus == HrSensorStatus.measuring &&
+        hasFreshLocalBleReading) {
+      final liveBpm = _hrService.currentBpm;
+      return (
+        effectiveBpm: liveBpm,
+        bpmDisplay: '$liveBpm',
+        statusLabel: _resolveHeartRateStatusLabel(
+          backendStatus: null,
+          bpm: liveBpm,
+          baselineSufficient: baselineSufficient,
+          p25: p25,
+          p75: p75,
+          episodeMargin: episodeMargin,
+          preferDynamicBpmCalculation: true,
+        ),
+        measurementStateLabel: 'Pembacaan langsung BLE',
+      );
+    }
+
+    // 2. Mode BLE dalam siklus istirahat sensor
+    if (isBleMode && bleStatus == HrSensorStatus.resting) {
+      if (hasFreshLocalBleReading) {
+        final lastBleBpm = _hrService.currentBpm;
+        return (
+          effectiveBpm: lastBleBpm,
+          bpmDisplay: '$lastBleBpm',
+          statusLabel: _resolveHeartRateStatusLabel(
+            backendStatus: null,
+            bpm: lastBleBpm,
+            baselineSufficient: baselineSufficient,
+            p25: p25,
+            p75: p75,
+            episodeMargin: episodeMargin,
+            preferDynamicBpmCalculation: true,
+          ),
+          measurementStateLabel: 'Bacaan terakhir · jeda istirahat',
+        );
+      }
+      if (hasBackendBpm && !isBackendStale) {
+        final backendBpm = analysisCurrent!.bpm!;
+        return (
+          effectiveBpm: backendBpm,
+          bpmDisplay: '$backendBpm',
+          statusLabel: _resolveHeartRateStatusLabel(
+            backendStatus: analysisCurrent.status,
+            bpm: backendBpm,
+            baselineSufficient: baselineSufficient,
+            p25: p25,
+            p75: p75,
+            episodeMargin: episodeMargin,
+          ),
+          measurementStateLabel: _formatMeasurementStateLabel(analysisCurrent),
+        );
+      }
+      return (
+        effectiveBpm: null,
+        bpmDisplay: '--',
+        statusLabel: 'Data tidak terbaru',
+        measurementStateLabel: 'Data terakhir kedaluwarsa',
+      );
+    }
+
+    // 3. Mode BLE tetapi sensor terputus
+    if (isBleMode && bleStatus == HrSensorStatus.disconnected) {
+      if (hasBackendBpm && !isBackendStale) {
+        final backendBpm = analysisCurrent!.bpm!;
+        return (
+          effectiveBpm: backendBpm,
+          bpmDisplay: '$backendBpm',
+          statusLabel: _resolveHeartRateStatusLabel(
+            backendStatus: analysisCurrent.status,
+            bpm: backendBpm,
+            baselineSufficient: baselineSufficient,
+            p25: p25,
+            p75: p75,
+            episodeMargin: episodeMargin,
+          ),
+          measurementStateLabel: 'Sensor terputus · bacaan terakhir',
+        );
+      }
+      if (hasBackendBpm && isBackendStale) {
+        return (
+          effectiveBpm: null,
+          bpmDisplay: '--',
+          statusLabel: 'Data tidak terbaru',
+          measurementStateLabel: 'Sensor terputus · data kedaluwarsa',
+        );
+      }
+      return (
+        effectiveBpm: null,
+        bpmDisplay: '--',
+        statusLabel: 'Sensor terputus',
+        measurementStateLabel: 'Belum ada pembacaan sensor',
+      );
+    }
+
+    // 4. Mode Dummy (bukan sensor fisik langsung)
+    if (analysisCurrent != null) {
+      if (hasBackendBpm) {
+        if (isBackendStale) {
+          return (
+            effectiveBpm: null,
+            bpmDisplay: '--',
+            statusLabel: 'Data tidak terbaru',
+            measurementStateLabel: 'Data terakhir kedaluwarsa',
+          );
+        }
+        final backendBpm = analysisCurrent.bpm!;
+        return (
+          effectiveBpm: backendBpm,
+          bpmDisplay: '$backendBpm',
+          statusLabel: _resolveHeartRateStatusLabel(
+            backendStatus: analysisCurrent.status,
+            bpm: backendBpm,
+            baselineSufficient: baselineSufficient,
+            p25: p25,
+            p75: p75,
+            episodeMargin: episodeMargin,
+          ),
+          measurementStateLabel: _formatMeasurementStateLabel(analysisCurrent),
+        );
+      }
+      // Backend merespons tanpa bacaan terkini (jangan gunakan angka dummy sebagai bacaan sensor aktual)
+      return (
+        effectiveBpm: null,
+        bpmDisplay: '--',
+        statusLabel: 'Belum ada pembacaan',
+        measurementStateLabel: 'Belum ada data terbaru',
+      );
+    }
+
+    // Fallback pratinjau simulasi contoh saat belum terhubung ke analisis backend
+    return (
+      effectiveBpm: null,
+      bpmDisplay: '${_hrService.currentBpm}',
+      statusLabel: 'Mode simulasi contoh',
+      measurementStateLabel: 'Simulasi (bukan sensor aktual)',
+    );
+  }
+
+  Color _resolveStatusBadgeColor(String statusLabel) {
+    switch (statusLabel) {
+      case 'Dalam rentang biasa':
+        return const Color(0xFF1ECE9F);
+      case 'Sedikit di atas baseline':
+        return const Color(0xFFF59E0B);
+      case 'Jauh di atas baseline':
+        return const Color(0xFFE8A24F);
+      default:
+        return Colors.white.withValues(alpha: 0.7);
+    }
+  }
+
+  String _formatMeasurementStateLabel(AnalysisCurrent? current) {
+    if (current == null) return '';
+    switch (current.measurementState) {
+      case 'mengukur':
+        return 'Sensor aktif mengukur';
+      case 'istirahat_jam':
+        final restMin = (current.expectedRestSeconds / 60).round();
+        return 'Jeda istirahat sensor (~$restMin mnt)';
+      case 'tidak_ada_data':
+        return 'Belum ada data terbaru';
+      default:
+        return '';
     }
   }
 
@@ -317,32 +657,46 @@ class _HomeScreenState extends State<HomeScreen> {
                   ..._children.map((child) {
                     final isSelected = child.id == _activeChild?.id;
                     return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 4,
+                      ),
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: isSelected ? const Color(0xFFE3EEDF) : Colors.grey.shade100,
+                          color: isSelected
+                              ? const Color(0xFFE3EEDF)
+                              : Colors.grey.shade100,
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
                           Icons.face_rounded,
-                          color: isSelected ? const Color(0xFF1F5C4A) : Colors.grey.shade600,
+                          color: isSelected
+                              ? const Color(0xFF1F5C4A)
+                              : Colors.grey.shade600,
                         ),
                       ),
                       title: Text(
                         child.nickname,
                         style: GoogleFonts.inter(
                           fontSize: 15,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.w500,
                           color: const Color(0xFF1E2A24),
                         ),
                       ),
                       subtitle: Text(
                         'Tahun lahir: ${child.birthYear}',
-                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF6F7B74)),
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: const Color(0xFF6F7B74),
+                        ),
                       ),
                       trailing: isSelected
-                          ? const Icon(Icons.check_circle_rounded, color: Color(0xFF1F5C4A))
+                          ? const Icon(
+                              Icons.check_circle_rounded,
+                              color: Color(0xFF1F5C4A),
+                            )
                           : null,
                       onTap: () {
                         Navigator.pop(ctx);
@@ -366,7 +720,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Color(0xFF1F5C4A)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
@@ -392,7 +748,9 @@ class _HomeScreenState extends State<HomeScreen> {
           builder: (context, setDialogState) {
             return AlertDialog(
               backgroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
               title: Text(
                 'Tambah Anak',
                 style: GoogleFonts.inter(
@@ -411,10 +769,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       decoration: InputDecoration(
                         labelText: 'Nama Panggilan',
                         hintText: 'Contoh: Bima',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       validator: (val) {
-                        if (val == null || val.trim().isEmpty) return 'Nama tidak boleh kosong';
+                        if (val == null || val.trim().isEmpty) {
+                          return 'Nama tidak boleh kosong';
+                        }
                         return null;
                       },
                     ),
@@ -425,12 +787,18 @@ class _HomeScreenState extends State<HomeScreen> {
                       decoration: InputDecoration(
                         labelText: 'Tahun Lahir',
                         hintText: 'Contoh: 2018',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       validator: (val) {
-                        if (val == null || val.trim().isEmpty) return 'Tahun lahir tidak boleh kosong';
+                        if (val == null || val.trim().isEmpty) {
+                          return 'Tahun lahir tidak boleh kosong';
+                        }
                         final year = int.tryParse(val.trim());
-                        if (year == null || year < 1900 || year > DateTime.now().year) {
+                        if (year == null ||
+                            year < 1900 ||
+                            year > DateTime.now().year) {
                           return 'Masukkan tahun yang valid';
                         }
                         return null;
@@ -442,7 +810,10 @@ class _HomeScreenState extends State<HomeScreen> {
               actions: [
                 TextButton(
                   onPressed: isSaving ? null : () => Navigator.pop(ctx),
-                  child: Text('Batal', style: GoogleFonts.inter(color: const Color(0xFF6F7B74))),
+                  child: Text(
+                    'Batal',
+                    style: GoogleFonts.inter(color: const Color(0xFF6F7B74)),
+                  ),
                 ),
                 ElevatedButton(
                   onPressed: isSaving
@@ -457,7 +828,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           final navigator = Navigator.of(ctx);
 
                           final nickname = nicknameController.text.trim();
-                          final birthYear = int.parse(birthYearController.text.trim());
+                          final birthYear = int.parse(
+                            birthYearController.text.trim(),
+                          );
 
                           final newChild = await _apiService.createChild(
                             nickname: nickname,
@@ -490,13 +863,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF1F5C4A),
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   child: isSaving
                       ? const SizedBox(
                           width: 18,
                           height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         )
                       : const Text('Simpan'),
                 ),
@@ -554,13 +932,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // Logo kiri
-        Flexible(
-          child: _buildLogo(),
-        ),
+        Flexible(child: _buildLogo()),
         const SizedBox(width: 8),
-
-        // Kanan: Lonceng notifikasi & Chip anak
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -585,8 +958,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(width: 6),
-
-            // Chip anak aktif + panah
             Semantics(
               label: 'Ganti Anak Aktif: $activeChildName',
               button: true,
@@ -595,7 +966,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 onTap: _showChildSwitcherSheet,
                 child: Container(
                   constraints: const BoxConstraints(maxWidth: 130),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
@@ -744,13 +1118,75 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// 3. Kartu Detak Jantung Sekarang (CurrentHeartRateCard adaptation)
   Widget _buildMonitoringCard() {
-    final currentBpm = _hrService.currentBpm;
-    final statusText = _hrService.statusText;
+    final analysis = _analysisData;
+    final analysisBaseline = analysis?.baseline;
+    final analysisCurrent = analysis?.current;
 
-    String baselineText = 'Baseline belum cukup data';
-    if (_baselineData != null && _baselineData!['sufficient'] == true && _baselineData!['median'] != null) {
-      baselineText = 'Baseline pribadi ${_baselineData!['median']} BPM';
+    final bool baselineSufficient = analysisBaseline != null
+        ? analysisBaseline.sufficient
+        : (_baselineData != null && _baselineData!['sufficient'] == true);
+
+    final double? median = analysisBaseline?.median ??
+        (baselineSufficient
+            ? (_baselineData?['median'] as num?)?.toDouble()
+            : null);
+    final double? p25 = analysisBaseline?.p25 ??
+        (baselineSufficient
+            ? (_baselineData?['p25'] as num?)?.toDouble()
+            : null);
+    final double? p75 = analysisBaseline?.p75 ??
+        (baselineSufficient
+            ? (_baselineData?['p75'] as num?)?.toDouble()
+            : null);
+    final int sampleCount = analysisBaseline?.sampleCount ??
+        ((_baselineData?['sample_count'] as num?)?.toInt() ?? 0);
+    final int minSamples = analysisBaseline?.minSamples ?? 100;
+    final int episodeMargin =
+        (analysis?.meta.parameters['episode_margin_bpm'] as num?)?.toInt() ?? 10;
+    final int staleAfterSeconds =
+        (analysis?.meta.parameters['stale_after_seconds'] as num?)?.toInt() ??
+            420;
+
+    final resolvedState = _resolveCurrentMonitoringState(
+      analysisCurrent: analysisCurrent,
+      baselineSufficient: baselineSufficient,
+      p25: p25,
+      p75: p75,
+      episodeMargin: episodeMargin,
+      staleAfterSeconds: staleAfterSeconds,
+    );
+
+    final int? effectiveBpm = resolvedState.effectiveBpm;
+    final String bpmDisplay = resolvedState.bpmDisplay;
+    final String statusLabel = resolvedState.statusLabel;
+    final String measurementStateLabel = resolvedState.measurementStateLabel;
+    final Color badgeColor = _resolveStatusBadgeColor(statusLabel);
+
+    final String statusText = _hrService.statusText;
+
+    String baselineSummaryText = 'Baseline belum cukup data';
+    String positionDescription = '';
+    if (baselineSufficient && median != null && p25 != null && p75 != null) {
+      baselineSummaryText = 'Baseline pribadi ${median.round()} BPM';
+      if (effectiveBpm != null) {
+        final diffMedian = effectiveBpm - median.round();
+        final diffPrefix = diffMedian >= 0 ? '+$diffMedian' : '$diffMedian';
+        if (effectiveBpm < p25) {
+          positionDescription =
+              '${(p25.round() - effectiveBpm)} BPM di bawah batas p25 ($diffPrefix dari median)';
+        } else if (effectiveBpm <= p75) {
+          positionDescription =
+              'Berada di dalam rentang p25–p75 ($diffPrefix dari median)';
+        } else {
+          positionDescription =
+              '+${(effectiveBpm - p75.round())} BPM di atas batas p75 ($diffPrefix dari median)';
+        }
+      }
+    } else if (sampleCount > 0) {
+      baselineSummaryText =
+          'Baseline belum cukup data ($sampleCount/$minSamples sampel)';
     }
 
     return Container(
@@ -792,36 +1228,65 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          // Angka BPM besar
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
+          // Angka BPM besar + Badge status detak jantung
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 8,
             children: [
-              Text(
-                '$currentBpm',
-                style: GoogleFonts.inter(
-                  fontSize: 48,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                  letterSpacing: -1,
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    bpmDisplay,
+                    style: GoogleFonts.inter(
+                      fontSize: 48,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: -1,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'BPM',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white.withValues(alpha: 0.85),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              Text(
-                'BPM',
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white.withValues(alpha: 0.85),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: badgeColor.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: badgeColor.withValues(alpha: 0.65),
+                  ),
+                ),
+                child: Text(
+                  statusLabel,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
 
-          // Baris status dari logika BLE / dummy
+          // Baris status koneksi sensor (BLE / dummy)
           Row(
             children: [
               Container(
@@ -829,7 +1294,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 height: 8,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: _hrService.sensorStatus == HrSensorStatus.disconnected && _hrService.currentMode == Mode.ble
+                  color: _hrService.sensorStatus ==
+                              HrSensorStatus.disconnected &&
+                          _hrService.currentMode == Mode.ble
                       ? Colors.redAccent
                       : const Color(0xFF1ECE9F),
                 ),
@@ -845,15 +1312,26 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
+              if (measurementStateLabel.isNotEmpty)
+                Flexible(
+                  child: Text(
+                    measurementStateLabel,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white.withValues(alpha: 0.75),
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 14),
 
-          // Divider halus
           Divider(color: Colors.white.withValues(alpha: 0.15), height: 1),
           const SizedBox(height: 14),
 
-          // Baris bawah dari GET baseline
+          // Baris ringkasan baseline
           Row(
             children: [
               Icon(
@@ -864,30 +1342,192 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  baselineText,
+                  baselineSummaryText,
                   style: GoogleFonts.inter(
                     fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    color: Colors.white.withValues(alpha: 0.85),
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white.withValues(alpha: 0.9),
                   ),
                 ),
               ),
             ],
           ),
+
+          // Detail baseline p25-p75, median, jumlah sampel, dan posisi BPM terkini terhadap rentang
+          if (baselineSufficient &&
+              median != null &&
+              p25 != null &&
+              p75 != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildBaselineMetricItem(
+                          label: 'Rentang p25–p75',
+                          value: '${p25.round()}–${p75.round()} BPM',
+                        ),
+                      ),
+                      Expanded(
+                        child: _buildBaselineMetricItem(
+                          label: 'Median',
+                          value: '${median.round()} BPM',
+                        ),
+                      ),
+                      Expanded(
+                        child: _buildBaselineMetricItem(
+                          label: 'Sampel baseline',
+                          value: '$sampleCount sampel',
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (effectiveBpm != null) ...[
+                    const SizedBox(height: 10),
+                    _buildBaselinePositionBar(
+                      currentBpm: effectiveBpm.toDouble(),
+                      p25: p25,
+                      median: median,
+                      p75: p75,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      positionDescription,
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withValues(alpha: 0.85),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildTrendCard() {
-    final p75 = (_baselineData != null && _baselineData!['sufficient'] == true)
-        ? (_baselineData!['p75'] as num?)?.toDouble()
-        : null;
+  Widget _buildBaselineMetricItem({
+    required String label,
+    required String value,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 10,
+            fontWeight: FontWeight.w400,
+            color: Colors.white.withValues(alpha: 0.7),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+      ],
+    );
+  }
 
-    final hasData = _hourlyAverages.isNotEmpty;
+  Widget _buildBaselinePositionBar({
+    required double currentBpm,
+    required double p25,
+    required double median,
+    required double p75,
+  }) {
+    final double minScale = math.min(p25 - 15, currentBpm - 5).clamp(40.0, 180.0);
+    final double maxScale =
+        math.max(p75 + 25, currentBpm + 5).clamp(minScale + 10.0, 200.0);
+    final double span = maxScale - minScale;
+
+    final double p25Ratio = ((p25 - minScale) / span).clamp(0.0, 1.0);
+    final double p75Ratio = ((p75 - minScale) / span).clamp(0.0, 1.0);
+    final double currentRatio =
+        ((currentBpm - minScale) / span).clamp(0.0, 1.0);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final totalWidth = constraints.maxWidth;
+        final bandLeft = p25Ratio * totalWidth;
+        final bandWidth = math.max(4.0, (p75Ratio - p25Ratio) * totalWidth);
+        final double dotLeft = (currentRatio * totalWidth - 6)
+            .clamp(0.0, math.max(0.0, totalWidth - 12))
+            .toDouble();
+
+        return SizedBox(
+          height: 14,
+          child: Stack(
+            alignment: Alignment.centerLeft,
+            children: [
+              Container(
+                height: 6,
+                width: totalWidth,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+              Positioned(
+                left: bandLeft,
+                width: bandWidth,
+                child: Container(
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE3EEDF),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: dotLeft,
+                child: Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: currentBpm > p75
+                        ? const Color(0xFFE8A24F)
+                        : const Color(0xFF1ECE9F),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Ringkasan Episode Kenaikan BPM yang ringkas untuk Beranda
+  Widget _buildEpisodesSummaryCard() {
+    final analysis = _analysisData;
+    if (analysis == null) return const SizedBox.shrink();
+
+    final episodes = analysis.episodes;
+    final baselineSufficient = analysis.baseline.sufficient;
+    final visibleEpisodes =
+        episodes.length > 3 ? episodes.sublist(0, 3) : episodes;
+    final remainingCount = episodes.length - visibleEpisodes.length;
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -902,111 +1542,170 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Tren detak jantung',
-            style: GoogleFonts.inter(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF1E2A24),
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  'Ringkasan episode kenaikan',
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF1E2A24),
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: episodes.isNotEmpty
+                      ? const Color(0xFFE8A24F).withValues(alpha: 0.18)
+                      : const Color(0xFFE3EEDF),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${episodes.length} episode',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: episodes.isNotEmpty
+                        ? const Color(0xFFB45309)
+                        : const Color(0xFF1F5C4A),
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
+          if (!baselineSufficient)
+            Text(
+              'Deteksi episode membutuhkan minimal ${analysis.baseline.minSamples} sampel baseline (saat ini ${analysis.baseline.sampleCount} sampel).',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: const Color(0xFF6F7B74),
+                height: 1.35,
+              ),
+            )
+          else if (episodes.isEmpty)
+            Text(
+              'Tidak ada episode kenaikan di atas ambang baseline pada rentang ini.',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: const Color(0xFF6F7B74),
+                height: 1.35,
+              ),
+            )
+          else ...[
+            ...List.generate(visibleEpisodes.length, (idx) {
+              final ep = visibleEpisodes[idx];
+              final startStr = _formatTimeWib(ep.start);
+              final endStr = _formatTimeWib(ep.end);
+              final durationStr = _formatDuration(ep.durationSeconds);
+              final note = ep.note;
 
-          // Area 7 Bar
-          SizedBox(
-            height: 130,
-            child: hasData
-                ? Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: _hourlyAverages.map((item) {
-                      final avg = (item['avg'] as num).toDouble();
-                      final label = item['label'].toString();
-
-                      final isAboveP75 = p75 != null && avg > p75;
-                      final barColor = isAboveP75 ? const Color(0xFFE8A24F) : const Color(0xFFE3EEDF);
-
-                      // Proportional bar height (scale 40..140 BPM to 20..100 px)
-                      final heightRatio = ((avg - 40) / 100).clamp(0.15, 1.0);
-                      final barHeight = heightRatio * 90;
-
-                      return Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Text(
-                            avg.round().toString(),
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
-                              color: const Color(0xFF6F7B74),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            width: 24,
-                            height: barHeight,
-                            decoration: BoxDecoration(
-                              color: barColor,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            label,
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w400,
-                              color: const Color(0xFF6F7B74),
-                            ),
-                          ),
-                        ],
-                      );
-                    }).toList(),
-                  )
-                : Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+              return Container(
+                margin: EdgeInsets.only(
+                  bottom: idx == visibleEpisodes.length - 1 ? 0 : 8,
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF6F4EF),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE5E0D5)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: List.generate(7, (index) {
-                            return Container(
-                              width: 24,
-                              height: 40 + (index % 3) * 15.0,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF6F4EF),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: const Color(0xFFD9DED6)),
-                              ),
-                            );
-                          }),
-                        ),
-                        const SizedBox(height: 14),
                         Text(
-                          'Belum ada data',
+                          '$startStr–$endStr ($durationStr)',
                           style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFF6F7B74),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF1E2A24),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color:
+                                const Color(0xFFE8A24F).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'Puncak ${ep.peakBpm} BPM (+${ep.deltaFromMedian.round()})',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFFB45309),
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-          ),
-          const SizedBox(height: 14),
-
-          // Label kecil
-          Center(
-            child: Text(
-              'Rata-rata per jam · bukan diagnosis',
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                fontWeight: FontWeight.w400,
-                color: const Color(0xFF6F7B74),
+                    const SizedBox(height: 4),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          note != null
+                              ? getEventTypeIcon(note.type)
+                              : Icons.info_outline_rounded,
+                          size: 14,
+                          color: note != null
+                              ? const Color(0xFF1F5C4A)
+                              : const Color(0xFF6F7B74),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            note != null
+                                ? '${getEventTypeName(note.type)}${note.textPreview.isNotEmpty ? ' · ${note.textPreview}' : ''}'
+                                : 'Tanpa catatan kejadian terkait',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: note != null
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                              color: note != null
+                                  ? const Color(0xFF1E2A24)
+                                  : const Color(0xFF6F7B74),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }),
+            if (remainingCount > 0) ...[
+              const SizedBox(height: 6),
+              Text(
+                '+$remainingCount episode lainnya tercatat hari ini',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFF6F7B74),
+                ),
               ),
-            ),
-          ),
+            ],
+          ],
         ],
       ),
     );
@@ -1025,21 +1724,30 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: () async {
                 if (_activeChild == null) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Pilih atau tambahkan anak terlebih dahulu')),
+                    const SnackBar(
+                      content: Text(
+                        'Pilih atau tambahkan anak terlebih dahulu',
+                      ),
+                    ),
                   );
                   return;
                 }
                 final result = await Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => EventNoteScreen(childId: _activeChild!.id),
+                    builder: (context) =>
+                        EventNoteScreen(childId: _activeChild!.id),
                   ),
                 );
                 if (result == true && _activeChild != null) {
                   _fetchStatsForChild(_activeChild!.id);
                 }
               },
-              icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+              icon: const Icon(
+                Icons.add_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
               label: Text(
                 '+ Catatan kejadian',
                 style: GoogleFonts.inter(
@@ -1220,7 +1928,10 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 12.0,
+                ),
                 child: _buildHeader(),
               ),
               Expanded(
@@ -1240,7 +1951,10 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 12.0,
+                ),
                 child: _buildHeader(),
               ),
               Expanded(
@@ -1261,7 +1975,10 @@ class _HomeScreenState extends State<HomeScreen> {
             final horizontalPadding = constraints.maxWidth * 0.06;
 
             return SingleChildScrollView(
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16),
+              padding: EdgeInsets.symmetric(
+                horizontal: horizontalPadding,
+                vertical: 16,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -1277,13 +1994,25 @@ class _HomeScreenState extends State<HomeScreen> {
                   _buildBanner(),
                   const SizedBox(height: 18),
 
-                  // Kartu Hijau PEMANTAUAN DETAK JANTUNG
+                  // Kartu Hijau PEMANTAUAN DETAK JANTUNG (Kartu Detak Jantung Sekarang)
                   _buildMonitoringCard(),
                   const SizedBox(height: 18),
 
-                  // Kartu Tren detak jantung
-                  _buildTrendCard(),
-                  const SizedBox(height: 20),
+                  // Grafik Pemantauan Time-Series BPM
+                  HomeMonitoringChartCard(
+                    analysisData: _analysisData,
+                    baselineData: _baselineData,
+                    hourlyAverages: _hourlyAverages,
+                    isLoadingAnalysis: _isLoadingAnalysis,
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Ringkasan Episode Kenaikan BPM yang ringkas (jika data analisis tersedia)
+                  if (_analysisData != null) ...[
+                    _buildEpisodesSummaryCard(),
+                    const SizedBox(height: 18),
+                  ] else
+                    const SizedBox(height: 2),
 
                   // Tombol + Catatan kejadian dan teks keterangan
                   _buildEventNoteButton(),

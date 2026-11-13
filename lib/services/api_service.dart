@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../models/analysis_model.dart';
 import '../models/child_model.dart';
 import 'auth_service.dart';
 import 'config_service.dart';
@@ -277,6 +278,75 @@ class ApiService {
     } catch (e) {
       debugPrint('[ApiService] Error fetching baseline: $e');
       return null;
+    }
+  }
+
+  /// Ambil data analisis detak jantung dan catatan kejadian anak (GET /api/children/{child}/analysis).
+  Future<AnalysisModel> getChildAnalysis(
+    int childId, {
+    DateTime? from,
+    DateTime? to,
+    String? timezone = 'Asia/Jakarta',
+  }) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null || token.isEmpty) {
+        throw Exception('Unauthenticated');
+      }
+
+      final baseUrl = await _configService.getBaseUrl();
+      final queryParams = <String, String>{};
+      if (from != null) {
+        queryParams['from'] = from.toIso8601String();
+      }
+      if (to != null) {
+        queryParams['to'] = to.toIso8601String();
+      }
+      if (timezone != null && timezone.trim().isNotEmpty) {
+        queryParams['tz'] = timezone.trim();
+      }
+
+      final url = Uri.parse('$baseUrl/children/$childId/analysis').replace(
+        queryParameters: queryParams.isNotEmpty ? queryParams : null,
+      );
+
+      final response = await _client.get(
+        url,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return AnalysisModel.fromJson(data);
+      } else if (response.statusCode == 401) {
+        throw Exception('Unauthenticated');
+      } else {
+        String? serverMessage;
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map && decoded['message'] != null) {
+            serverMessage = decoded['message'].toString();
+          }
+        } catch (_) {}
+        throw Exception(
+          serverMessage ?? 'Server mengembalikan status ${response.statusCode}',
+        );
+      }
+    } on TimeoutException {
+      throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
+    } on SocketException {
+      throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
+    } catch (e) {
+      if (e is http.ClientException ||
+          e.toString().contains('SocketException') ||
+          e.toString().contains('TimeoutException')) {
+        throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
+      }
+      debugPrint('[ApiService] Error fetching child analysis: $e');
+      rethrow;
     }
   }
 
