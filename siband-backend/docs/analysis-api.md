@@ -222,3 +222,9 @@ Parameter `note_exclusion_minutes` (`10` menit) dan `physical_activity_exclusion
 ## 4. Data Demo Lokal (`siband:demo-analysis`)
 
 Untuk pengujian tampilan pada lingkungan lokal/pengembangan (ditolak otomatis pada `production`), jalankan `php artisan siband:demo-analysis {child_id} [--date=YYYY-MM-DD] [--rest-minutes=5]` guna mengisi sampel detak jantung (`device_name='DEMO'`) beserta catatan kejadian (`[DEMO] ...`) pukul 06:00–14:00 WIB, atau tambahkan opsi `--purge` (`php artisan siband:demo-analysis {child_id} --purge`) untuk menghapus khusus data DEMO milik anak tersebut tanpa menyentuh data asli. **Peringatan:** Seluruh data yang dihasilkan oleh perintah ini adalah **data tiruan (sintetis)** semata untuk simulasi antarmuka, **bukan hasil pengukuran perangkat maupun subjek nyata**, serta **tidak boleh dikutip atau disajikan sebagai hasil pengujian/penelitian**.
+
+---
+
+## 5. Kontrak Penyimpanan BPM (`POST /api/heart-rate`)
+
+Endpoint `POST /api/heart-rate` (`auth:sanctum`) menerima `bpm` (`required|integer|30..220`), `recorded_at` (`required|date`), serta parameter opsional `child_id` (`nullable|integer|exists:children,id`), `device_id` (`nullable|integer|exists:devices,id`), `device_name`, dan `device_mac` sambil tetap menyimpan `user_id` pengguna yang login; bila `child_id` dikirim maka anak harus milik pengguna tersebut (selain itu `403`), bila `device_id` dikirim maka perangkat harus terpasang pada anak milik pengguna tersebut (selain itu `403`), bila keduanya dikirim maka `device->child_id` harus sama dengan `child_id` (selain itu `422`), dan bila hanya `device_id` yang dikirim maka `child_id` diisi otomatis dari `device->child_id` (sementara `GET /api/heart-rate` juga mendukung query opsional `child_id` dengan pemeriksaan kepemilikan yang sama).
