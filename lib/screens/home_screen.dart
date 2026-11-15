@@ -45,6 +45,8 @@ class _HomeScreenState extends State<HomeScreen> {
   ChildModel? _activeChild;
   bool _isLoadingChildren = true;
   bool _isLoadingAnalysis = false;
+  bool _isRetryingAnalysis = false;
+  bool _analysisLoadFailed = false;
   String? _errorMessage;
 
   String _userName = 'Orang Tua';
@@ -240,16 +242,26 @@ class _HomeScreenState extends State<HomeScreen> {
     await _fetchStatsForChild(child.id);
   }
 
+  bool _isUnauthenticatedError(Object error) {
+    final msg = error.toString().toLowerCase();
+    return msg.contains('unauthenticated') || msg.contains('401');
+  }
+
   Future<void> _fetchStatsForChild(int childId) async {
-    if (mounted && _analysisData == null) {
+    if (mounted) {
       setState(() {
-        _isLoadingAnalysis = true;
+        if (_analysisData == null) {
+          _isLoadingAnalysis = true;
+        }
+        _isRetryingAnalysis = true;
       });
     }
 
     AnalysisModel? fetchedAnalysis;
     Map<String, dynamic>? fetchedBaseline;
     List<Map<String, dynamic>> fetchedHistory = [];
+    bool analysisFailed = false;
+    bool historySucceeded = false;
 
     await Future.wait([
       () async {
@@ -258,33 +270,52 @@ class _HomeScreenState extends State<HomeScreen> {
             childId,
             timezone: 'Asia/Jakarta',
           );
-        } catch (_) {}
+        } catch (e, st) {
+          debugPrint('[HomeScreen] Error fetching child analysis: $e\n$st');
+          if (!_isUnauthenticatedError(e)) {
+            analysisFailed = true;
+          }
+        }
       }(),
       () async {
         try {
           fetchedBaseline = await _apiService.getBaseline(childId, days: 7);
-        } catch (_) {}
+        } catch (e, st) {
+          debugPrint('[HomeScreen] Error fetching baseline: $e\n$st');
+        }
       }(),
       () async {
         try {
           fetchedHistory = await _apiService.getHeartRateHistory(hours: 24);
-        } catch (_) {}
+          historySucceeded = true;
+        } catch (e, st) {
+          debugPrint('[HomeScreen] Error fetching heart rate history: $e\n$st');
+        }
       }(),
     ]);
 
     if (!mounted) return;
 
-    final hourly = _computeHourlyAverages(fetchedHistory);
+    final hourly =
+        historySucceeded ? _computeHourlyAverages(fetchedHistory) : null;
 
     setState(() {
       _isLoadingAnalysis = false;
+      _isRetryingAnalysis = false;
       if (fetchedAnalysis != null) {
         _analysisData = fetchedAnalysis;
+        _analysisLoadFailed = false;
+      } else if (analysisFailed) {
+        _analysisLoadFailed = true;
+      } else {
+        _analysisLoadFailed = false;
       }
       if (fetchedBaseline != null) {
         _baselineData = fetchedBaseline;
       }
-      _hourlyAverages = hourly;
+      if (hourly != null) {
+        _hourlyAverages = hourly;
+      }
     });
   }
 
@@ -2005,6 +2036,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     hourlyAverages: _hourlyAverages,
                     isLoadingAnalysis: _isLoadingAnalysis,
                   ),
+                  if (_analysisLoadFailed) ...[
+                    const SizedBox(height: 8),
+                    _buildAnalysisErrorNotice(),
+                  ],
                   const SizedBox(height: 18),
 
                   // Ringkasan Episode Kenaikan BPM yang ringkas (jika data analisis tersedia)
@@ -2022,6 +2057,55 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           },
         ),
+      ),
+    );
+  }
+
+  Widget _buildAnalysisErrorNotice() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.info_outline_rounded,
+            size: 16,
+            color: Color(0xFF64748B),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Data analisis belum bisa dimuat',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: const Color(0xFF64748B),
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: (_activeChild == null || _isRetryingAnalysis)
+                ? null
+                : () => _fetchStatsForChild(_activeChild!.id),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF1F5C4A),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              'Coba lagi',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
