@@ -7,8 +7,12 @@ import '../models/analysis_model.dart';
 import '../models/child_model.dart';
 import 'auth_service.dart';
 import 'config_service.dart';
+import 'session_guard.dart';
 
 class ApiService {
+  static const String rateLimitMessage =
+      'Terlalu banyak percobaan. Coba lagi sebentar.';
+
   final AuthService _authService;
   final ConfigService _configService;
   final http.Client _client;
@@ -20,6 +24,15 @@ class ApiService {
   })  : _authService = authService ?? AuthService(),
         _configService = configService ?? ConfigService(),
         _client = client ?? http.Client();
+
+  Future<void> _handleCommonErrors(int statusCode) async {
+    if (statusCode == 401) {
+      await SessionGuard.handleUnauthorized(authService: _authService);
+      throw Exception('Unauthenticated');
+    } else if (statusCode == 429) {
+      throw Exception(rateLimitMessage);
+    }
+  }
 
   Future<bool> postHeartRate({
     required int bpm,
@@ -146,6 +159,7 @@ class ApiService {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((json) => ChildModel.fromJson(json as Map<String, dynamic>)).toList();
       } else {
+        await _handleCommonErrors(response.statusCode);
         throw Exception('Server mengembalikan status ${response.statusCode}');
       }
     } on TimeoutException {
@@ -321,9 +335,8 @@ class ApiService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         return AnalysisModel.fromJson(data);
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthenticated');
       } else {
+        await _handleCommonErrors(response.statusCode);
         String? serverMessage;
         try {
           final decoded = jsonDecode(response.body);
@@ -387,6 +400,11 @@ class ApiService {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         return {'success': true, 'message': 'Catatan tersimpan'};
+      } else if (response.statusCode == 401) {
+        await SessionGuard.handleUnauthorized(authService: _authService);
+        return {'success': false, 'message': 'Unauthenticated'};
+      } else if (response.statusCode == 429) {
+        return {'success': false, 'message': rateLimitMessage};
       } else {
         String msg = 'Gagal menyimpan catatan';
         try {
@@ -441,9 +459,8 @@ class ApiService {
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data.cast<Map<String, dynamic>>();
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthenticated');
       } else {
+        await _handleCommonErrors(response.statusCode);
         throw Exception('Server mengembalikan status ${response.statusCode}');
       }
     } on TimeoutException {
@@ -480,9 +497,8 @@ class ApiService {
 
       if (response.statusCode == 200 || response.statusCode == 204) {
         return true;
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthenticated');
       }
+      await _handleCommonErrors(response.statusCode);
       return false;
     } on TimeoutException {
       throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
@@ -520,9 +536,8 @@ class ApiService {
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthenticated');
       }
+      await _handleCommonErrors(response.statusCode);
       return null;
     } on TimeoutException {
       throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
@@ -559,9 +574,8 @@ class ApiService {
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data.cast<Map<String, dynamic>>();
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthenticated');
       }
+      await _handleCommonErrors(response.statusCode);
       return [];
     } on TimeoutException {
       throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
@@ -599,9 +613,8 @@ class ApiService {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         return jsonDecode(response.body) as Map<String, dynamic>;
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthenticated');
       }
+      await _handleCommonErrors(response.statusCode);
       return null;
     } on TimeoutException {
       throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
@@ -637,9 +650,8 @@ class ApiService {
 
       if (response.statusCode == 200) {
         return true;
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthenticated');
       }
+      await _handleCommonErrors(response.statusCode);
       return false;
     } on TimeoutException {
       throw Exception('Tidak dapat terhubung ke server. Periksa koneksi lalu coba lagi.');
@@ -686,7 +698,10 @@ class ApiService {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         return {'success': true, 'data': data, 'device': data, 'statusCode': response.statusCode};
       } else if (response.statusCode == 401) {
+        await SessionGuard.handleUnauthorized(authService: _authService);
         return {'success': false, 'message': 'Unauthenticated', 'statusCode': 401};
+      } else if (response.statusCode == 429) {
+        return {'success': false, 'message': rateLimitMessage, 'statusCode': 429};
       } else {
         String msg = 'Gagal memasangkan jam';
         try {

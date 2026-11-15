@@ -411,6 +411,9 @@ void main() {
         throwsA(isA<Exception>()),
       );
 
+      // 401 clears the stored token; restore it before testing 422.
+      SharedPreferences.setMockInitialValues({'access_token': 'test-sanctum-token'});
+
       final client422 = MockClient((_) async => http.Response('{"message":"Parameter tz tidak valid."}', 422));
       final service422 = ApiService(client: client422);
       await expectLater(
