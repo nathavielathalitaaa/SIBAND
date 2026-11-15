@@ -37,6 +37,13 @@ class AuthService {
         }),
       ).timeout(const Duration(seconds: 15));
 
+      if (response.statusCode == 429) {
+        return {
+          'success': false,
+          'message': 'Terlalu banyak percobaan. Coba lagi sebentar.',
+        };
+      }
+
       final Map<String, dynamic> data = jsonDecode(response.body);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -101,6 +108,13 @@ class AuthService {
           'password': password,
         }),
       ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 429) {
+        return {
+          'success': false,
+          'message': 'Terlalu banyak percobaan. Coba lagi sebentar.',
+        };
+      }
 
       final Map<String, dynamic> data = jsonDecode(response.body);
 
@@ -173,6 +187,12 @@ class AuthService {
       'success': true,
       'message': 'Berhasil keluar',
     };
+  }
+
+  /// Hapus token lokal tanpa memanggil endpoint logout.
+  Future<void> clearToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(tokenKey);
   }
 
   /// Ambil token yang tersimpan di local storage.

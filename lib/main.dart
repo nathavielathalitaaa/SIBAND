@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'services/auth_service.dart';
+import 'services/session_guard.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,6 +15,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: SessionGuard.navigatorKey,
       title: 'CalmiBand',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
