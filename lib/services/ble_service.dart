@@ -112,6 +112,22 @@ class BleService {
     }
   }
 
+  /// Kirim ulang command trigger pengukuran HR saat jam masih terhubung
+  /// tetapi berhenti mengirim data sementara.
+  Future<void> retriggerHrMeasurement() async {
+    final device = _connectedDevice;
+    if (device == null) return;
+    if (_feeaWriteChar == null) {
+      await triggerContinuousHrMeasurement(device);
+      return;
+    }
+    debugPrint("[BLE] Mengirim re-trigger measurement: $triggerHrPayload");
+    await _feeaWriteChar!.write(
+      triggerHrPayload,
+      withoutResponse: true,
+    );
+  }
+
   /// Panggil ini pas disconnect, biar jam berhenti ngukur terus-terusan
   /// (hemat baterai jam).
   Future<void> stopHrMeasurement() async {

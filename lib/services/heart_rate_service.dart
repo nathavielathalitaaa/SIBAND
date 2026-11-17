@@ -13,16 +13,34 @@ enum HrSensorStatus { measuring, resting, disconnected }
 class HeartRateService extends ChangeNotifier {
   static final HeartRateService instance = HeartRateService._internal();
 
-  HeartRateService._internal() : _apiService = ApiService() {
+  HeartRateService._internal()
+      : _apiService = ApiService(),
+        _bleService = BleService(),
+        _onRetriggerOverride = null,
+        _onReconnectOverride = null {
     unawaited(loadSavedDevice());
   }
 
   @visibleForTesting
-  HeartRateService.forTesting({ApiService? apiService})
-      : _apiService = apiService ?? ApiService();
+  HeartRateService.forTesting({
+    ApiService? apiService,
+    BleService? bleService,
+    Future<void> Function()? onRetrigger,
+    Future<void> Function()? onReconnect,
+  })  : _apiService = apiService ?? ApiService(),
+        _bleService = bleService ?? BleService(),
+        _onRetriggerOverride = onRetrigger,
+        _onReconnectOverride = onReconnect;
+
+  static const int retriggerFirstThresholdSeconds = 240;
+  static const int retriggerSecondThresholdSeconds = 300;
+  static const int reconnectThresholdSeconds = 360;
+  static const int staleTimeoutSeconds = 420;
 
   final ApiService _apiService;
-  final BleService _bleService = BleService();
+  final BleService _bleService;
+  final Future<void> Function()? _onRetriggerOverride;
+  final Future<void> Function()? _onReconnectOverride;
   final Random _random = Random();
 
   // Dummy hanya untuk tampilan; kirim ke server hanya untuk uji sengaja.
@@ -67,6 +85,10 @@ class HeartRateService extends ChangeNotifier {
   String? get pairedDeviceName => _pairedDeviceName;
 
   bool _isStarted = false;
+  final Set<int> _attemptedRecoveryStages = <int>{};
+  bool _isRecoveringBle = false;
+  bool _needsDeviceRepair = false;
+  bool get needsDeviceRepair => _needsDeviceRepair;
 
   void setActiveChild(int? childId) {
     _activeChildId = childId;
@@ -165,9 +187,95 @@ class HeartRateService extends ChangeNotifier {
           _secondsSinceLastBpm = diff;
           notifyListeners();
         }
+        if (_currentMode == Mode.ble) {
+          unawaited(_evaluateBleRecovery(diff));
+        }
       }
     });
   }
+
+  Future<void> _evaluateBleRecovery(int silentSeconds) async {
+    if (_currentMode != Mode.ble || _isRecoveringBle) return;
+    if (_connectedDevice == null &&
+        _onRetriggerOverride == null &&
+        _onReconnectOverride == null) {
+      return;
+    }
+
+    if (silentSeconds >= staleTimeoutSeconds) {
+      if (!_needsDeviceRepair) {
+        _needsDeviceRepair = true;
+        _bleStatus = 'Perlu hubungkan ulang perangkat';
+        notifyListeners();
+      }
+      return;
+    }
+
+    if (silentSeconds >= reconnectThresholdSeconds &&
+        !_attemptedRecoveryStages.contains(reconnectThresholdSeconds)) {
+      _attemptedRecoveryStages.add(reconnectThresholdSeconds);
+      await _runRecoveryAction(
+        () => _onReconnectOverride != null
+            ? _onReconnectOverride()
+            : _reconnectCurrentDevice(),
+        'reconnect',
+      );
+    } else if (silentSeconds >= retriggerSecondThresholdSeconds &&
+        !_attemptedRecoveryStages.contains(retriggerSecondThresholdSeconds)) {
+      _attemptedRecoveryStages.add(retriggerSecondThresholdSeconds);
+      await _runRecoveryAction(
+        () => _onRetriggerOverride != null
+            ? _onRetriggerOverride()
+            : _retriggerCurrentDevice(),
+        'retrigger-5m',
+      );
+    } else if (silentSeconds >= retriggerFirstThresholdSeconds &&
+        !_attemptedRecoveryStages.contains(retriggerFirstThresholdSeconds)) {
+      _attemptedRecoveryStages.add(retriggerFirstThresholdSeconds);
+      await _runRecoveryAction(
+        () => _onRetriggerOverride != null
+            ? _onRetriggerOverride()
+            : _retriggerCurrentDevice(),
+        'retrigger-4m',
+      );
+    }
+  }
+
+  Future<void> _runRecoveryAction(
+    Future<void> Function() action,
+    String label,
+  ) async {
+    _isRecoveringBle = true;
+    try {
+      debugPrint('[HeartRateService] Menjalankan pemulihan BLE ($label)...');
+      await action();
+    } catch (e) {
+      debugPrint('[HeartRateService] Pemulihan BLE ($label) gagal: $e');
+    } finally {
+      _isRecoveringBle = false;
+    }
+  }
+
+  Future<void> _retriggerCurrentDevice() async {
+    final device = _connectedDevice;
+    if (device == null) return;
+    if (_currentBleState != BluetoothConnectionState.connected) {
+      await _reconnectCurrentDevice();
+      return;
+    }
+    await _bleService.retriggerHrMeasurement();
+  }
+
+  Future<void> _reconnectCurrentDevice() async {
+    final device = _connectedDevice;
+    if (device == null) return;
+    await _bleService.disconnect();
+    await connectToDevice(device, preserveRecoveryStages: true);
+  }
+
+  @visibleForTesting
+  Future<void> evaluateBleRecoveryForTest(int silentSeconds) =>
+      _evaluateBleRecovery(silentSeconds);
 
   void _startDummyMode() {
     _currentBleState = BluetoothConnectionState.connected;
@@ -210,6 +318,8 @@ class HeartRateService extends ChangeNotifier {
       _connectedDevice = null;
       _bleStatus = '';
       _isConnectingBle = false;
+      _attemptedRecoveryStages.clear();
+      _needsDeviceRepair = false;
       _currentBleState = BluetoothConnectionState.connected;
       _startDummyMode();
     } else {
@@ -219,13 +329,20 @@ class HeartRateService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> connectToDevice(BluetoothDevice device) async {
+  Future<void> connectToDevice(
+    BluetoothDevice device, {
+    bool preserveRecoveryStages = false,
+  }) async {
     _bleBpmSubscription?.cancel();
     _deviceStateSubscription?.cancel();
 
     _currentMode = Mode.ble;
     _connectedDevice = device;
     _isConnectingBle = true;
+    _needsDeviceRepair = false;
+    if (!preserveRecoveryStages) {
+      _attemptedRecoveryStages.clear();
+    }
 
     final deviceName = device.platformName.isNotEmpty ? device.platformName : device.remoteId.str;
     _bleStatus = 'Menghubungkan ke $deviceName...';
@@ -254,6 +371,8 @@ class HeartRateService extends ChangeNotifier {
         _currentBpm = bpm;
         _lastBpmReceivedAt = DateTime.now();
         _secondsSinceLastBpm = 0;
+        _attemptedRecoveryStages.clear();
+        _needsDeviceRepair = false;
         notifyListeners();
 
         _apiService.postHeartRate(
@@ -281,6 +400,8 @@ class HeartRateService extends ChangeNotifier {
     _connectedDevice = null;
     _currentBleState = BluetoothConnectionState.disconnected;
     _bleStatus = 'Terputus';
+    _attemptedRecoveryStages.clear();
+    _needsDeviceRepair = false;
     notifyListeners();
   }
 
@@ -291,6 +412,7 @@ class HeartRateService extends ChangeNotifier {
     int bpm = 75,
     DateTime? lastBpmReceivedAt,
     int secondsSinceLastBpm = 0,
+    bool needsDeviceRepair = false,
   }) {
     _dummyTimer?.cancel();
     _currentMode = mode;
@@ -298,6 +420,8 @@ class HeartRateService extends ChangeNotifier {
     _currentBpm = bpm;
     _lastBpmReceivedAt = lastBpmReceivedAt;
     _secondsSinceLastBpm = secondsSinceLastBpm;
+    _attemptedRecoveryStages.clear();
+    _needsDeviceRepair = needsDeviceRepair;
     notifyListeners();
   }
 
