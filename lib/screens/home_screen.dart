@@ -10,6 +10,7 @@ import '../services/heart_rate_service.dart';
 import '../utils/event_type_helper.dart';
 import '../widgets/home_monitoring_chart_card.dart';
 import 'event_note_screen.dart';
+import 'pair_device_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onNavigateToPanduan;
@@ -1357,6 +1358,44 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
             ],
           ),
+          if (_hrService.needsDeviceRepair) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PairDeviceScreen(
+                        childId: _activeChild?.id,
+                        childNickname: _activeChild?.nickname,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.bluetooth_searching_rounded, size: 16),
+                label: Text(
+                  'Pasang ulang perangkat',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: BorderSide(color: Colors.white.withValues(alpha: 0.45)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
 
           Divider(color: Colors.white.withValues(alpha: 0.15), height: 1),
