@@ -20,6 +20,7 @@ class HomeScreen extends StatefulWidget {
   final Future<List<ChildModel>> Function()? onFetchChildren;
   final AnalysisModel? initialAnalysisData;
   final ApiService? apiService;
+  final bool isActiveTab;
 
   const HomeScreen({
     super.key,
@@ -30,6 +31,7 @@ class HomeScreen extends StatefulWidget {
     this.onFetchChildren,
     this.initialAnalysisData,
     this.apiService,
+    this.isActiveTab = true,
   });
 
   @override
@@ -98,6 +100,13 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void didUpdateWidget(covariant HomeScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.initialChildren != oldWidget.initialChildren &&
+        widget.initialChildren != null) {
+      setState(() {
+        _children = widget.initialChildren!;
+        _activeChild = _children.isNotEmpty ? _children.first : null;
+      });
+    }
     if (widget.initialAnalysisData != oldWidget.initialAnalysisData &&
         widget.initialAnalysisData != null) {
       setState(() {
@@ -2044,55 +2053,98 @@ class _HomeScreenState extends State<HomeScreen> {
           builder: (context, constraints) {
             final horizontalPadding = constraints.maxWidth * 0.06;
 
-            return SingleChildScrollView(
-              padding: EdgeInsets.symmetric(
-                horizontal: horizontalPadding,
-                vertical: 16,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Header
-                  _buildHeader(),
-                  const SizedBox(height: 20),
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(
+                      horizontalPadding,
+                      16,
+                      horizontalPadding,
+                      88,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Header
+                        _buildHeader(),
+                        const SizedBox(height: 20),
 
-                  // Sapaan
-                  _buildGreeting(),
-                  const SizedBox(height: 18),
+                        // Sapaan
+                        _buildGreeting(),
+                        const SizedBox(height: 18),
 
-                  // Banner Yuk Memahami Anak
-                  _buildBanner(),
-                  const SizedBox(height: 18),
+                        // Banner Yuk Memahami Anak
+                        _buildBanner(),
+                        const SizedBox(height: 18),
 
-                  // Kartu Hijau PEMANTAUAN DETAK JANTUNG (Kartu Detak Jantung Sekarang)
-                  _buildMonitoringCard(),
-                  const SizedBox(height: 18),
+                        // Kartu Hijau PEMANTAUAN DETAK JANTUNG (Kartu Detak Jantung Sekarang)
+                        _buildMonitoringCard(),
+                        const SizedBox(height: 18),
 
-                  // Grafik Pemantauan Time-Series BPM
-                  HomeMonitoringChartCard(
-                    analysisData: _analysisData,
-                    baselineData: _baselineData,
-                    hourlyAverages: _hourlyAverages,
-                    isLoadingAnalysis: _isLoadingAnalysis,
+                        // Grafik Pemantauan Time-Series BPM
+                        HomeMonitoringChartCard(
+                          analysisData: _analysisData,
+                          baselineData: _baselineData,
+                          hourlyAverages: _hourlyAverages,
+                          isLoadingAnalysis: _isLoadingAnalysis,
+                        ),
+                        if (_analysisLoadFailed) ...[
+                          const SizedBox(height: 8),
+                          _buildAnalysisErrorNotice(),
+                        ],
+                        const SizedBox(height: 18),
+
+                        // Ringkasan Episode Kenaikan BPM yang ringkas (jika data analisis tersedia)
+                        if (_analysisData != null) ...[
+                          _buildEpisodesSummaryCard(),
+                          const SizedBox(height: 18),
+                        ] else
+                          const SizedBox(height: 2),
+
+                        // Tombol + Catatan kejadian dan teks keterangan
+                        _buildEventNoteButton(),
+                        const SizedBox(height: 16),
+                      ],
+                    ),
                   ),
-                  if (_analysisLoadFailed) ...[
-                    const SizedBox(height: 8),
-                    _buildAnalysisErrorNotice(),
-                  ],
-                  const SizedBox(height: 18),
-
-                  // Ringkasan Episode Kenaikan BPM yang ringkas (jika data analisis tersedia)
-                  if (_analysisData != null) ...[
-                    _buildEpisodesSummaryCard(),
-                    const SizedBox(height: 18),
-                  ] else
-                    const SizedBox(height: 2),
-
-                  // Tombol + Catatan kejadian dan teks keterangan
-                  _buildEventNoteButton(),
-                  const SizedBox(height: 16),
-                ],
-              ),
+                ),
+                if (widget.isActiveTab && _activeChild != null)
+                  Positioned(
+                    right: 16,
+                    bottom: 16,
+                    child: FloatingActionButton.extended(
+                      key: const Key('fab_catat_kejadian'),
+                      heroTag: null,
+                      backgroundColor: const Color(0xFF1F5C4A),
+                      foregroundColor: Colors.white,
+                      elevation: 3,
+                      onPressed: () async {
+                        final child = _activeChild;
+                        if (child == null) return;
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                EventNoteScreen(childId: child.id),
+                          ),
+                        );
+                        if (result == true && _activeChild != null) {
+                          _fetchStatsForChild(_activeChild!.id);
+                        }
+                      },
+                      icon: const Icon(Icons.add_rounded, size: 20),
+                      label: Text(
+                        'Catat kejadian',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             );
           },
         ),

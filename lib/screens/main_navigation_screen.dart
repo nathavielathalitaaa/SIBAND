@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/child_model.dart';
 import 'guide_screen.dart';
 import 'home_screen.dart';
-import 'location_screen.dart';
 import 'profile_screen.dart';
 import 'recap_screen.dart';
 
@@ -51,13 +50,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         initialUserName: widget.initialUserName,
         initialErrorMessage: widget.initialErrorMessage,
         onFetchChildren: widget.onFetchChildren,
+        isActiveTab: _currentIndex == 0,
       ),
       const GuideScreen(),
       RecapScreen(
         initialChildren: widget.initialChildren,
-      ),
-      LocationScreen(
-        onBackToHome: () => _onTabSelected(0),
       ),
       ProfileScreen(
         onChildrenChanged: () {
@@ -71,7 +68,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       {'label': 'Beranda', 'icon': Icons.home_rounded},
       {'label': 'Panduan', 'icon': Icons.menu_book_rounded},
       {'label': 'Rekap', 'icon': Icons.bar_chart_rounded},
-      {'label': 'GPS', 'icon': Icons.location_on_rounded},
       {'label': 'Profil', 'icon': Icons.person_rounded},
     ];
 

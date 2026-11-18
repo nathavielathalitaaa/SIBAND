@@ -201,7 +201,7 @@ void main() {
       expect(find.text('Beranda'), findsOneWidget);
       expect(find.text('Panduan'), findsOneWidget);
       expect(find.text('Rekap'), findsOneWidget);
-      expect(find.text('GPS'), findsOneWidget);
+      expect(find.text('GPS'), findsNothing);
       expect(find.text('Profil'), findsOneWidget);
     });
 
@@ -230,11 +230,6 @@ void main() {
       await tester.tap(find.text('Rekap'));
       await tester.pumpAndSettle();
       expect(find.text('Riwayat & Rekap'), findsOneWidget);
-
-      // Tap GPS
-      await tester.tap(find.text('GPS'));
-      await tester.pumpAndSettle();
-      expect(find.text('Lokasi anak'), findsOneWidget);
 
       // Tap Profil
       await tester.tap(find.text('Profil'));
@@ -397,7 +392,7 @@ void main() {
       expect(find.text('Beranda'), findsOneWidget);
       expect(find.text('Panduan'), findsOneWidget);
       expect(find.text('Rekap'), findsOneWidget);
-      expect(find.text('GPS'), findsOneWidget);
+      expect(find.text('GPS'), findsNothing);
       expect(find.text('Profil'), findsOneWidget);
     });
 
@@ -418,7 +413,7 @@ void main() {
       expect(find.text('Beranda'), findsOneWidget);
       expect(find.text('Panduan'), findsOneWidget);
       expect(find.text('Rekap'), findsOneWidget);
-      expect(find.text('GPS'), findsOneWidget);
+      expect(find.text('GPS'), findsNothing);
       expect(find.text('Profil'), findsOneWidget);
     });
 
@@ -442,7 +437,7 @@ void main() {
       expect(find.text('Beranda'), findsOneWidget);
       expect(find.text('Panduan'), findsOneWidget);
       expect(find.text('Rekap'), findsOneWidget);
-      expect(find.text('GPS'), findsOneWidget);
+      expect(find.text('GPS'), findsNothing);
       expect(find.text('Profil'), findsOneWidget);
     });
 
@@ -553,7 +548,7 @@ void main() {
           await tester.pumpWidget(
             buildTestable(
               MainNavigationScreen(
-                initialIndex: 4,
+                initialIndex: 3,
                 initialChildren: mockChildren,
                 onFetchChildren: () async => mockChildren,
               ),
@@ -1020,7 +1015,7 @@ void main() {
     );
   });
 
-  group('LocationScreen (GPS Tab) Tests', () {
+  group('LocationScreen Tests', () {
     const gpsTestSizes = [
       Size(360, 640),
       Size(412, 915),
@@ -1029,7 +1024,7 @@ void main() {
 
     for (final size in gpsTestSizes) {
       testWidgets(
-        'Tab GPS tata letak di ${size.width.toInt()}x${size.height.toInt()}: bar bawah menempel & <=96, tombol Perbarui Lokasi terlihat setelah scroll',
+        'LocationScreen tata letak di ${size.width.toInt()}x${size.height.toInt()}: tombol Perbarui Lokasi terlihat setelah scroll',
         (tester) async {
           tester.view.physicalSize = size;
           tester.view.devicePixelRatio = 1.0;
@@ -1043,30 +1038,14 @@ void main() {
 
           await tester.pumpWidget(
             buildTestable(
-              MainNavigationScreen(
-                initialIndex: 3,
-                initialChildren: mockChildren,
-                onFetchChildren: () async => mockChildren,
-              ),
+              const LocationScreen(),
               size: size,
             ),
           );
           await tester.pumpAndSettle();
 
           expect(tester.takeException(), isNull);
-
-          final mainScaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
-          expect(mainScaffold.bottomNavigationBar, isNotNull);
-          final bottomNavFinder = find.byWidget(mainScaffold.bottomNavigationBar!);
-          final bottomNavRect = tester.getRect(bottomNavFinder);
-
-          expect(bottomNavRect.height, lessThanOrEqualTo(96.0));
-          expect(bottomNavRect.bottom, equals(size.height));
-
-          final bodyFinder = find.byType(IndexedStack);
-          final bodyRect = tester.getRect(bodyFinder);
-          expect(bodyRect.height, greaterThan(0));
-          expect(bodyRect.bottom, lessThanOrEqualTo(bottomNavRect.top));
+          expect(find.text('Lokasi anak'), findsOneWidget);
 
           // Pastikan tombol Perbarui Lokasi terlihat di dalam layar setelah scroll bila perlu
           final updateBtnFinder = find.widgetWithText(ElevatedButton, 'Perbarui Lokasi');
@@ -1075,7 +1054,7 @@ void main() {
           await tester.pumpAndSettle();
           final updateRect = tester.getRect(updateBtnFinder);
           expect(updateRect.top, greaterThanOrEqualTo(0));
-          expect(updateRect.bottom, lessThanOrEqualTo(bottomNavRect.top));
+          expect(updateRect.bottom, lessThanOrEqualTo(size.height));
         },
       );
     }
@@ -1123,14 +1102,15 @@ void main() {
     );
 
     testWidgets(
-      'Tombol kembali kiri atas pada tab GPS berpindah ke tab Beranda',
+      'Tombol kembali kiri atas pada LocationScreen memanggil callback onBackToHome',
       (tester) async {
+        bool backCalled = false;
         await tester.pumpWidget(
           buildTestable(
-            MainNavigationScreen(
-              initialIndex: 3,
-              initialChildren: mockChildren,
-              onFetchChildren: () async => mockChildren,
+            LocationScreen(
+              onBackToHome: () {
+                backCalled = true;
+              },
             ),
           ),
         );
@@ -1147,7 +1127,7 @@ void main() {
         await tester.tap(backBtnFinder);
         await tester.pumpAndSettle();
 
-        expect(find.text('PEMANTAUAN DETAK JANTUNG'), findsOneWidget);
+        expect(backCalled, isTrue);
       },
     );
   });
