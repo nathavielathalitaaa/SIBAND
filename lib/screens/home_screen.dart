@@ -10,6 +10,7 @@ import '../services/heart_rate_service.dart';
 import '../utils/event_type_helper.dart';
 import '../widgets/home_monitoring_chart_card.dart';
 import 'event_note_screen.dart';
+import 'guide_calming_screen.dart';
 import 'pair_device_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -1736,39 +1737,94 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          note != null
-                              ? getEventTypeIcon(note.type)
-                              : Icons.info_outline_rounded,
-                          size: 14,
-                          color: note != null
-                              ? const Color(0xFF1F5C4A)
-                              : const Color(0xFF6F7B74),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            note != null
-                                ? '${getEventTypeName(note.type)}${note.textPreview.isNotEmpty ? ' · ${note.textPreview}' : ''}'
-                                : 'Tanpa catatan kejadian terkait',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: note != null
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
-                              color: note != null
-                                  ? const Color(0xFF1E2A24)
-                                  : const Color(0xFF6F7B74),
+                    if (note != null)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            getEventTypeIcon(note.type),
+                            size: 14,
+                            color: const Color(0xFF1F5C4A),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '${getEventTypeName(note.type)}${note.textPreview.isNotEmpty ? ' · ${note.textPreview}' : ''}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF1E2A24),
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      )
+                    else
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE2E8F0),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'Belum dicatat',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: const Color(0xFF475569),
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _activeChild == null
+                                ? null
+                                : () async {
+                                    final childId = _activeChild!.id;
+                                    final parsedStart =
+                                        DateTime.tryParse(ep.start)?.toLocal();
+                                    final result = await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => EventNoteScreen(
+                                          childId: childId,
+                                          initialOccurredAt: parsedStart,
+                                        ),
+                                      ),
+                                    );
+                                    if (result == true &&
+                                        _activeChild != null) {
+                                      _fetchStatsForChild(_activeChild!.id);
+                                    }
+                                  },
+                            style: TextButton.styleFrom(
+                              foregroundColor: const Color(0xFF1F5C4A),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: Text(
+                              'Tambah catatan',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                   ],
                 ),
               );
@@ -1785,6 +1841,38 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ],
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => GuideCalmingScreen(
+                      childId: _activeChild?.id,
+                    ),
+                  ),
+                );
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF1F5C4A),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(
+                'Lihat panduan menenangkan',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
