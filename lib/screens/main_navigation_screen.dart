@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/child_model.dart';
+import '../widgets/thin_line_logo.dart';
 import 'guide_screen.dart';
 import 'home_screen.dart';
 import 'location_screen.dart';
@@ -91,11 +92,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     ];
 
     final navItems = [
-      {'label': 'Beranda', 'icon': Icons.home_rounded},
-      {'label': 'Panduan', 'icon': Icons.menu_book_rounded},
-      {'label': 'Rekap', 'icon': Icons.bar_chart_rounded},
-      {'label': 'GPS', 'icon': Icons.location_on_rounded},
-      {'label': 'Profil', 'icon': Icons.person_rounded},
+      {'label': 'Beranda', 'type': ThinLineNavType.home},
+      {'label': 'Panduan', 'type': ThinLineNavType.guide},
+      {'label': 'Rekap', 'type': ThinLineNavType.recap},
+      {'label': 'GPS', 'type': ThinLineNavType.location},
+      {'label': 'Profil', 'type': ThinLineNavType.profile},
     ];
 
     return Scaffold(
@@ -174,7 +175,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
                           final item = navItems[index];
                           final isSelected = _currentIndex == index;
                           final label = item['label'] as String;
-                          final icon = item['icon'] as IconData;
+                          final type = item['type'] as ThinLineNavType;
 
                           return Expanded(
                             child: Semantics(
@@ -200,9 +201,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
                                             milliseconds: 240,
                                           ),
                                           curve: Curves.easeOutBack,
-                                          child: Icon(
-                                            icon,
+                                          child: ThinLineNavIcon(
+                                            type: type,
                                             size: 22,
+                                            isSelected: isSelected,
                                             color: isSelected
                                                 ? const Color(0xFF1F5C4A)
                                                 : const Color(0xFF6F7B74),

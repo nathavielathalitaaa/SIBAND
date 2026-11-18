@@ -10,6 +10,7 @@ import '../services/heart_rate_service.dart';
 import '../utils/event_type_helper.dart';
 import '../widgets/heartbeat_pulse.dart';
 import '../widgets/home_monitoring_chart_card.dart';
+import '../widgets/thin_line_logo.dart';
 import 'event_note_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -948,37 +949,7 @@ class _HomeScreenState extends State<HomeScreen> {
       'assets/home/logo.png',
       height: 32,
       errorBuilder: (context, error, stackTrace) {
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1F5C4A),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.favorite_rounded,
-                color: Colors.white,
-                size: 16,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                'CalmiBand',
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-                style: GoogleFonts.inter(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF1F5C4A),
-                  letterSpacing: -0.5,
-                ),
-              ),
-            ),
-          ],
-        );
+        return const SibandThinLineLogo(size: 30);
       },
     );
   }
@@ -1043,7 +1014,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Icon(
-                        Icons.face_rounded,
+                        Icons.face_outlined,
                         size: 16,
                         color: Color(0xFF1F5C4A),
                       ),
@@ -1062,8 +1033,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(width: 2),
                       const Icon(
-                        Icons.arrow_drop_down_rounded,
-                        size: 18,
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 16,
                         color: Color(0xFF6F7B74),
                       ),
                     ],

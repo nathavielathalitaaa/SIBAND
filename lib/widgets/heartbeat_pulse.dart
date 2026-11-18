@@ -209,7 +209,7 @@ class HeartbeatPulseState extends State<HeartbeatPulse>
     }
 
     final icon = Icon(
-      Icons.favorite_rounded,
+      Icons.favorite_border_rounded,
       key: ValueKey<HeartbeatState>(widget.state),
       color: iconColor,
       size: 18,
