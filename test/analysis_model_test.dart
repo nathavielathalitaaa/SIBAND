@@ -480,7 +480,7 @@ void main() {
         expect(find.text('70–90 BPM'), findsOneWidget);
         expect(find.text('80 BPM'), findsOneWidget);
         expect(find.text('120 sampel'), findsOneWidget);
-        expect(find.text('Sensor aktif mengukur'), findsOneWidget);
+        expect(find.text('Jam sedang mengukur'), findsOneWidget);
 
         // 2. Grafik Pemantauan Time-Series (fl_chart LineChart), Pin Catatan, & Footer Time-Series
         expect(find.byType(LineChart), findsOneWidget);
@@ -635,7 +635,7 @@ void main() {
         expect(find.text('--'), findsOneWidget);
         expect(find.text('Jam · terputus'), findsOneWidget);
         expect(find.text('Data tidak terbaru'), findsOneWidget);
-        expect(find.text('Sensor terputus · data kedaluwarsa'), findsOneWidget);
+        expect(find.text('Jam tidak terhubung'), findsOneWidget);
       },
     );
 

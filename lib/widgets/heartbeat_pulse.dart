@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -36,7 +37,10 @@ class HeartbeatPulseState extends State<HeartbeatPulse>
   static const Color amberColor = Color(0xFFF59E0B);
   static const Color staleColor = Color(0xFF94A3B8);
 
+  static const int _maxCyclesPerBurst = 2;
   late final AnimationController _controller;
+  Timer? _keepAliveTimer;
+  int _completedHalfCycles = 0;
 
   @visibleForTesting
   Duration? get controllerDuration => _controller.duration;
@@ -50,7 +54,29 @@ class HeartbeatPulseState extends State<HeartbeatPulse>
     _controller = AnimationController(
       vsync: this,
       duration: _targetDuration(),
-    );
+    )..addStatusListener(_onAnimationStatus);
+  }
+
+  void _onAnimationStatus(AnimationStatus status) {
+    if (!mounted) return;
+    final disableAnimations =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (disableAnimations ||
+        widget.state == HeartbeatState.stale ||
+        widget.state == HeartbeatState.simulated) {
+      return;
+    }
+    if (status == AnimationStatus.completed) {
+      _completedHalfCycles++;
+      if (_completedHalfCycles < _maxCyclesPerBurst) {
+        _controller.reverse();
+      }
+    } else if (status == AnimationStatus.dismissed) {
+      _completedHalfCycles++;
+      if (_completedHalfCycles < _maxCyclesPerBurst) {
+        _controller.forward();
+      }
+    }
   }
 
   @override
@@ -90,6 +116,8 @@ class HeartbeatPulseState extends State<HeartbeatPulse>
     if (disableAnimations ||
         widget.state == HeartbeatState.stale ||
         widget.state == HeartbeatState.simulated) {
+      _keepAliveTimer?.cancel();
+      _keepAliveTimer = null;
       if (_controller.isAnimating) {
         _controller.stop();
       }
@@ -99,14 +127,37 @@ class HeartbeatPulseState extends State<HeartbeatPulse>
 
     // Untuk measuring & resting: perbarui durasi tanpa me-reset posisi ke 0
     // saat hanya BPM yang berubah.
+    _completedHalfCycles = 0;
     if (resetIfStateChanged && !_controller.isAnimating) {
       _controller.value = 0.0;
     }
-    _controller.repeat(reverse: true);
+    if (!_controller.isAnimating) {
+      if (_controller.status == AnimationStatus.completed) {
+        _controller.reverse();
+      } else {
+        _controller.forward();
+      }
+    }
+    _keepAliveTimer ??= Timer.periodic(const Duration(seconds: 3), (_) {
+      if (!mounted) return;
+      final disabled =
+          MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+      if (disabled ||
+          widget.state == HeartbeatState.stale ||
+          widget.state == HeartbeatState.simulated) {
+        return;
+      }
+      if (!_controller.isAnimating) {
+        _completedHalfCycles = 0;
+        _controller.forward(from: 0.0);
+      }
+    });
   }
 
   @override
   void dispose() {
+    _keepAliveTimer?.cancel();
+    _controller.removeStatusListener(_onAnimationStatus);
     _controller.dispose();
     super.dispose();
   }

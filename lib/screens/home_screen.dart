@@ -8,6 +8,7 @@ import '../models/child_model.dart';
 import '../services/api_service.dart';
 import '../services/heart_rate_service.dart';
 import '../utils/event_type_helper.dart';
+import '../widgets/heartbeat_pulse.dart';
 import '../widgets/home_monitoring_chart_card.dart';
 import 'event_note_screen.dart';
 
@@ -53,6 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
   AnalysisModel? _analysisData;
   Map<String, dynamic>? _baselineData;
   List<Map<String, dynamic>> _hourlyAverages = [];
+  final Set<String> _animatedEpisodeKeys = <String>{};
 
   Timer? _refreshTimer;
 
@@ -237,9 +239,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       _activeChild = child;
+      _animatedEpisodeKeys.clear();
     });
 
     await _fetchStatsForChild(child.id);
+  }
+
+  Future<void> _handlePullToRefresh() async {
+    if (widget.initialChildren == null) {
+      await _fetchChildren();
+    } else if (_activeChild != null) {
+      await _fetchStatsForChild(_activeChild!.id);
+    }
   }
 
   bool _isUnauthenticatedError(Object error) {
@@ -508,7 +519,7 @@ class _HomeScreenState extends State<HomeScreen> {
             episodeMargin: episodeMargin,
             preferDynamicBpmCalculation: true,
           ),
-          measurementStateLabel: 'Bacaan terakhir · jeda istirahat',
+          measurementStateLabel: 'Jam sedang beristirahat sebentar',
         );
       }
       if (hasBackendBpm && !isBackendStale) {
@@ -531,7 +542,7 @@ class _HomeScreenState extends State<HomeScreen> {
         effectiveBpm: null,
         bpmDisplay: '--',
         statusLabel: 'Data tidak terbaru',
-        measurementStateLabel: 'Data terakhir kedaluwarsa',
+        measurementStateLabel: 'Belum ada data baru',
       );
     }
 
@@ -550,7 +561,7 @@ class _HomeScreenState extends State<HomeScreen> {
             p75: p75,
             episodeMargin: episodeMargin,
           ),
-          measurementStateLabel: 'Sensor terputus · bacaan terakhir',
+          measurementStateLabel: 'Jam tidak terhubung · bacaan terakhir',
         );
       }
       if (hasBackendBpm && isBackendStale) {
@@ -558,14 +569,14 @@ class _HomeScreenState extends State<HomeScreen> {
           effectiveBpm: null,
           bpmDisplay: '--',
           statusLabel: 'Data tidak terbaru',
-          measurementStateLabel: 'Sensor terputus · data kedaluwarsa',
+          measurementStateLabel: 'Jam tidak terhubung',
         );
       }
       return (
         effectiveBpm: null,
         bpmDisplay: '--',
-        statusLabel: 'Sensor terputus',
-        measurementStateLabel: 'Belum ada pembacaan sensor',
+        statusLabel: 'Jam tidak terhubung',
+        measurementStateLabel: 'Menunggu bacaan pertama dari jam',
       );
     }
 
@@ -577,7 +588,7 @@ class _HomeScreenState extends State<HomeScreen> {
             effectiveBpm: null,
             bpmDisplay: '--',
             statusLabel: 'Data tidak terbaru',
-            measurementStateLabel: 'Data terakhir kedaluwarsa',
+            measurementStateLabel: 'Belum ada data baru',
           );
         }
         final backendBpm = analysisCurrent.bpm!;
@@ -600,7 +611,7 @@ class _HomeScreenState extends State<HomeScreen> {
         effectiveBpm: null,
         bpmDisplay: '--',
         statusLabel: 'Belum ada pembacaan',
-        measurementStateLabel: 'Belum ada data terbaru',
+        measurementStateLabel: 'Belum ada data baru',
       );
     }
 
@@ -611,6 +622,21 @@ class _HomeScreenState extends State<HomeScreen> {
       statusLabel: 'Mode simulasi contoh',
       measurementStateLabel: 'Simulasi (bukan sensor aktual)',
     );
+  }
+
+  HeartbeatState _resolveHeartbeatState(String measurementStateLabel) {
+    if (measurementStateLabel == 'Simulasi (bukan sensor aktual)') {
+      return HeartbeatState.simulated;
+    }
+    if (measurementStateLabel == 'Pembacaan langsung BLE' ||
+        measurementStateLabel == 'Jam sedang mengukur') {
+      return HeartbeatState.measuring;
+    }
+    if (measurementStateLabel == 'Jam sedang beristirahat sebentar' ||
+        measurementStateLabel.startsWith('Jeda istirahat sensor')) {
+      return HeartbeatState.resting;
+    }
+    return HeartbeatState.stale;
   }
 
   Color _resolveStatusBadgeColor(String statusLabel) {
@@ -630,12 +656,12 @@ class _HomeScreenState extends State<HomeScreen> {
     if (current == null) return '';
     switch (current.measurementState) {
       case 'mengukur':
-        return 'Sensor aktif mengukur';
+        return 'Jam sedang mengukur';
       case 'istirahat_jam':
         final restMin = (current.expectedRestSeconds / 60).round();
         return 'Jeda istirahat sensor (~$restMin mnt)';
       case 'tidak_ada_data':
-        return 'Belum ada data terbaru';
+        return 'Belum ada data baru';
       default:
         return '';
     }
@@ -1196,6 +1222,15 @@ class _HomeScreenState extends State<HomeScreen> {
     final Color badgeColor = _resolveStatusBadgeColor(statusLabel);
 
     final String statusText = _hrService.statusText;
+    final HeartbeatState heartbeatState =
+        _resolveHeartbeatState(measurementStateLabel);
+    final DateTime? lastReadingAt =
+        (_hrService.currentMode == Mode.ble &&
+                _hrService.lastBpmReceivedAt != null)
+            ? _hrService.lastBpmReceivedAt
+            : (analysisCurrent?.recordedAt != null
+                ? DateTime.tryParse(analysisCurrent!.recordedAt!)
+                : _hrService.lastBpmReceivedAt);
 
     String baselineSummaryText = 'Baseline belum cukup data';
     String positionDescription = '';
@@ -1252,10 +1287,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(
-                Icons.favorite_rounded,
-                color: Colors.redAccent,
-                size: 18,
+              HeartbeatPulse(
+                bpm: effectiveBpm ?? _hrService.currentBpm,
+                state: heartbeatState,
               ),
             ],
           ),
@@ -1272,13 +1306,35 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  Text(
-                    bpmDisplay,
-                    style: GoogleFonts.inter(
-                      fontSize: 48,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                      letterSpacing: -1,
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    transitionBuilder: (child, animation) {
+                      final slide = Tween<Offset>(
+                        begin: const Offset(0, 0.15),
+                        end: Offset.zero,
+                      ).animate(
+                        CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                      );
+                      return FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(
+                          position: slide,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: Text(
+                      bpmDisplay,
+                      key: ValueKey<String>(bpmDisplay),
+                      style: GoogleFonts.inter(
+                        fontSize: 48,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: -1,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1328,7 +1384,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: _hrService.sensorStatus ==
                               HrSensorStatus.disconnected &&
                           _hrService.currentMode == Mode.ble
-                      ? Colors.redAccent
+                      ? const Color(0xFF94A3B8)
                       : const Color(0xFF1ECE9F),
                 ),
               ),
@@ -1357,6 +1413,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
             ],
           ),
+          if (lastReadingAt != null) ...[
+            const SizedBox(height: 6),
+            LastUpdatedBpmText(lastReadingAt: lastReadingAt),
+          ],
           const SizedBox(height: 14),
 
           Divider(color: Colors.white.withValues(alpha: 0.15), height: 1),
@@ -1636,92 +1696,103 @@ class _HomeScreenState extends State<HomeScreen> {
               final endStr = _formatTimeWib(ep.end);
               final durationStr = _formatDuration(ep.durationSeconds);
               final note = ep.note;
+              final epKey = '${ep.index}_${ep.start}';
+              final shouldAnimate = !_animatedEpisodeKeys.contains(epKey);
 
-              return Container(
-                margin: EdgeInsets.only(
-                  bottom: idx == visibleEpisodes.length - 1 ? 0 : 8,
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF6F4EF),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE5E0D5)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text(
-                          '$startStr–$endStr ($durationStr)',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF1E2A24),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color:
-                                const Color(0xFFE8A24F).withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            'Puncak ${ep.peakBpm} BPM (+${ep.deltaFromMedian.round()})',
+              return EpisodeEntryFadeIn(
+                key: ValueKey<String>('episode_fade_$epKey'),
+                episodeKey: epKey,
+                staggerIndex: idx,
+                animateOnMount: shouldAnimate,
+                onAnimationStarted: () {
+                  _animatedEpisodeKeys.add(epKey);
+                },
+                child: Container(
+                  margin: EdgeInsets.only(
+                    bottom: idx == visibleEpisodes.length - 1 ? 0 : 8,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF6F4EF),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE5E0D5)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            '$startStr–$endStr ($durationStr)',
                             style: GoogleFonts.inter(
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
-                              color: const Color(0xFFB45309),
+                              color: const Color(0xFF1E2A24),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          note != null
-                              ? getEventTypeIcon(note.type)
-                              : Icons.info_outline_rounded,
-                          size: 14,
-                          color: note != null
-                              ? const Color(0xFF1F5C4A)
-                              : const Color(0xFF6F7B74),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8A24F)
+                                  .withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'Puncak ${ep.peakBpm} BPM (+${ep.deltaFromMedian.round()})',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFFB45309),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
                             note != null
-                                ? '${getEventTypeName(note.type)}${note.textPreview.isNotEmpty ? ' · ${note.textPreview}' : ''}'
-                                : 'Tanpa catatan kejadian terkait',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: note != null
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
-                              color: note != null
-                                  ? const Color(0xFF1E2A24)
-                                  : const Color(0xFF6F7B74),
+                                ? getEventTypeIcon(note.type)
+                                : Icons.info_outline_rounded,
+                            size: 14,
+                            color: note != null
+                                ? const Color(0xFF1F5C4A)
+                                : const Color(0xFF6F7B74),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              note != null
+                                  ? '${getEventTypeName(note.type)}${note.textPreview.isNotEmpty ? ' · ${note.textPreview}' : ''}'
+                                  : 'Tanpa catatan kejadian terkait',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: note != null
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                                color: note != null
+                                    ? const Color(0xFF1E2A24)
+                                    : const Color(0xFF6F7B74),
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               );
             }),
@@ -2005,54 +2076,59 @@ class _HomeScreenState extends State<HomeScreen> {
           builder: (context, constraints) {
             final horizontalPadding = constraints.maxWidth * 0.06;
 
-            return SingleChildScrollView(
-              padding: EdgeInsets.symmetric(
-                horizontal: horizontalPadding,
-                vertical: 16,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Header
-                  _buildHeader(),
-                  const SizedBox(height: 20),
+            return RefreshIndicator(
+              color: const Color(0xFF1F5C4A),
+              onRefresh: _handlePullToRefresh,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.symmetric(
+                  horizontal: horizontalPadding,
+                  vertical: 16,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Header
+                    _buildHeader(),
+                    const SizedBox(height: 20),
 
-                  // Sapaan
-                  _buildGreeting(),
-                  const SizedBox(height: 18),
-
-                  // Banner Yuk Memahami Anak
-                  _buildBanner(),
-                  const SizedBox(height: 18),
-
-                  // Kartu Hijau PEMANTAUAN DETAK JANTUNG (Kartu Detak Jantung Sekarang)
-                  _buildMonitoringCard(),
-                  const SizedBox(height: 18),
-
-                  // Grafik Pemantauan Time-Series BPM
-                  HomeMonitoringChartCard(
-                    analysisData: _analysisData,
-                    baselineData: _baselineData,
-                    hourlyAverages: _hourlyAverages,
-                    isLoadingAnalysis: _isLoadingAnalysis,
-                  ),
-                  if (_analysisLoadFailed) ...[
-                    const SizedBox(height: 8),
-                    _buildAnalysisErrorNotice(),
-                  ],
-                  const SizedBox(height: 18),
-
-                  // Ringkasan Episode Kenaikan BPM yang ringkas (jika data analisis tersedia)
-                  if (_analysisData != null) ...[
-                    _buildEpisodesSummaryCard(),
+                    // Sapaan
+                    _buildGreeting(),
                     const SizedBox(height: 18),
-                  ] else
-                    const SizedBox(height: 2),
 
-                  // Tombol + Catatan kejadian dan teks keterangan
-                  _buildEventNoteButton(),
-                  const SizedBox(height: 16),
-                ],
+                    // Banner Yuk Memahami Anak
+                    _buildBanner(),
+                    const SizedBox(height: 18),
+
+                    // Kartu Hijau PEMANTAUAN DETAK JANTUNG (Kartu Detak Jantung Sekarang)
+                    _buildMonitoringCard(),
+                    const SizedBox(height: 18),
+
+                    // Grafik Pemantauan Time-Series BPM
+                    HomeMonitoringChartCard(
+                      analysisData: _analysisData,
+                      baselineData: _baselineData,
+                      hourlyAverages: _hourlyAverages,
+                      isLoadingAnalysis: _isLoadingAnalysis,
+                    ),
+                    if (_analysisLoadFailed) ...[
+                      const SizedBox(height: 8),
+                      _buildAnalysisErrorNotice(),
+                    ],
+                    const SizedBox(height: 18),
+
+                    // Ringkasan Episode Kenaikan BPM yang ringkas (jika data analisis tersedia)
+                    if (_analysisData != null) ...[
+                      _buildEpisodesSummaryCard(),
+                      const SizedBox(height: 18),
+                    ] else
+                      const SizedBox(height: 2),
+
+                    // Tombol + Catatan kejadian dan teks keterangan
+                    _buildEventNoteButton(),
+                    const SizedBox(height: 16),
+                  ],
+                ),
               ),
             );
           },
@@ -2107,6 +2183,149 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Widget kecil tersendiri untuk menampilkan waktu pembaruan bacaan terakhir
+/// ("Diperbarui baru saja", "Diperbarui N dtk lalu", "Diperbarui N mnt lalu")
+/// yang diperbarui tiap 10 detik tanpa membangun ulang seluruh Beranda.
+class LastUpdatedBpmText extends StatefulWidget {
+  final DateTime lastReadingAt;
+
+  const LastUpdatedBpmText({
+    super.key,
+    required this.lastReadingAt,
+  });
+
+  static String formatLabel(DateTime lastReadingAt, {DateTime? now}) {
+    final diffSec = math.max(
+      0,
+      (now ?? DateTime.now()).difference(lastReadingAt).inSeconds,
+    );
+    if (diffSec < 10) {
+      return 'Diperbarui baru saja';
+    }
+    if (diffSec < 60) {
+      return 'Diperbarui $diffSec dtk lalu';
+    }
+    return 'Diperbarui ${diffSec ~/ 60} mnt lalu';
+  }
+
+  @override
+  State<LastUpdatedBpmText> createState() => _LastUpdatedBpmTextState();
+}
+
+class _LastUpdatedBpmTextState extends State<LastUpdatedBpmText> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      LastUpdatedBpmText.formatLabel(widget.lastReadingAt),
+      style: GoogleFonts.inter(
+        fontSize: 11,
+        fontWeight: FontWeight.w400,
+        color: Colors.white.withValues(alpha: 0.72),
+      ),
+    );
+  }
+}
+
+/// Pembungkus fade-in berurutan (jeda 60 ms per kartu) untuk kartu episode
+/// yang hanya memutar animasi saat pertama kali kartu tersebut tampil.
+class EpisodeEntryFadeIn extends StatefulWidget {
+  final String episodeKey;
+  final int staggerIndex;
+  final bool animateOnMount;
+  final VoidCallback onAnimationStarted;
+  final Widget child;
+
+  @visibleForTesting
+  static int animationTriggerCount = 0;
+
+  const EpisodeEntryFadeIn({
+    super.key,
+    required this.episodeKey,
+    required this.staggerIndex,
+    required this.animateOnMount,
+    required this.onAnimationStarted,
+    required this.child,
+  });
+
+  @override
+  State<EpisodeEntryFadeIn> createState() => _EpisodeEntryFadeInState();
+}
+
+class _EpisodeEntryFadeInState extends State<EpisodeEntryFadeIn>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _opacity;
+  bool _started = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final delayMs = widget.staggerIndex * 60;
+    final totalMs = 240 + delayMs;
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: totalMs),
+    );
+    final beginFraction = totalMs > 0 ? delayMs / totalMs : 0.0;
+    _opacity = CurvedAnimation(
+      parent: _controller,
+      curve: Interval(beginFraction, 1.0, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    final disableAnimations =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (widget.animateOnMount) {
+      widget.onAnimationStarted();
+      if (disableAnimations) {
+        _controller.value = 1.0;
+      } else {
+        EpisodeEntryFadeIn.animationTriggerCount++;
+        _controller.forward(from: 0.0);
+      }
+    } else {
+      _controller.value = 1.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _opacity,
+      child: widget.child,
     );
   }
 }
