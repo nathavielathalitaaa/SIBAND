@@ -40,6 +40,7 @@ class ApiService {
     String? deviceMac,
     int? childId,
     int? deviceId,
+    DateTime? recordedAt,
   }) async {
     try {
       final token = await _authService.getToken();
@@ -54,7 +55,7 @@ class ApiService {
         'bpm': bpm,
         'device_name': deviceName,
         'device_mac': deviceMac,
-        'recorded_at': DateTime.now().toIso8601String(),
+        'recorded_at': (recordedAt ?? DateTime.now()).toUtc().toIso8601String(),
       };
       if (childId != null) {
         payload['child_id'] = childId;
@@ -379,10 +380,7 @@ class ApiService {
       final baseUrl = await _configService.getBaseUrl();
       final url = Uri.parse('$baseUrl/children/$childId/event-notes');
 
-      final time = occurredAt ?? DateTime.now();
-      final formattedTime =
-          '${time.year.toString().padLeft(4, '0')}-${time.month.toString().padLeft(2, '0')}-${time.day.toString().padLeft(2, '0')} '
-          '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}:${time.second.toString().padLeft(2, '0')}';
+      final time = (occurredAt ?? DateTime.now()).toUtc();
 
       final response = await _client.post(
         url,
@@ -394,7 +392,7 @@ class ApiService {
         body: jsonEncode({
           'type': type,
           if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
-          'occurred_at': formattedTime,
+          'occurred_at': time.toIso8601String(),
         }),
       ).timeout(const Duration(seconds: 15));
 
