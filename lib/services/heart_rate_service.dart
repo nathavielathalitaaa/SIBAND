@@ -71,6 +71,7 @@ class HeartRateService extends ChangeNotifier {
 
   int _secondsSinceLastBpm = 0;
   int get secondsSinceLastBpm => _secondsSinceLastBpm;
+  int _secondsWaitingFirstBpm = 0;
 
   int _currentBpm = 75;
   int get currentBpm => _currentBpm;
@@ -149,13 +150,13 @@ class HeartRateService extends ChangeNotifier {
 
   String get statusText {
     if (_currentMode == Mode.dummy) {
-      return 'Data demo · tersambung';
+      return 'Sensor jam · siap';
     }
     switch (sensorStatus) {
       case HrSensorStatus.measuring:
         return 'Jam · mengukur';
       case HrSensorStatus.resting:
-        return 'Jam · sensor istirahat (normal)';
+        return 'Jam · memicu siklus berikutnya';
       case HrSensorStatus.disconnected:
         return 'Jam · terputus';
     }
@@ -165,8 +166,48 @@ class HeartRateService extends ChangeNotifier {
     if (_isStarted) return;
     _isStarted = true;
     _startStaleChecker();
-    if (_currentMode == Mode.dummy) {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      unawaited(autoConnectBondedWatch());
+    } else if (_currentMode == Mode.dummy) {
       _startDummyMode();
+    }
+  }
+
+  /// Otomatis mencari jam yang sudah di-pair/bonded di Bluetooth Android
+  /// (mis. XWatch H4) dan langsung menghubungkan stream BPM tanpa mode dummy.
+  Future<void> autoConnectBondedWatch() async {
+    if (_isConnectingBle ||
+        (_connectedDevice != null &&
+            _currentBleState == BluetoothConnectionState.connected)) {
+      return;
+    }
+    try {
+      await loadSavedDevice();
+      final bonded = await _bleService.getBondedDevices();
+      if (bonded.isEmpty) return;
+
+      BluetoothDevice target = bonded.first;
+      for (final d in bonded) {
+        final name = d.platformName.toLowerCase();
+        final saved = (_pairedDeviceName ?? '').toLowerCase();
+        if ((saved.isNotEmpty && name == saved) ||
+            name.contains('xwatch') ||
+            name.contains('h4')) {
+          target = d;
+          break;
+        }
+      }
+
+      final resolvedName = target.platformName.isNotEmpty
+          ? target.platformName
+          : (_pairedDeviceName ?? target.remoteId.str);
+      await setPairedDevice(
+        deviceId: _activeDeviceId ?? 2,
+        deviceName: resolvedName,
+      );
+      await connectToDevice(target);
+    } catch (e) {
+      debugPrint('[HeartRateService] Gagal auto-connect jam bonded: $e');
     }
   }
 
@@ -182,13 +223,36 @@ class HeartRateService extends ChangeNotifier {
     _staleCheckTimer?.cancel();
     _staleCheckTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (_lastBpmReceivedAt != null) {
+        _secondsWaitingFirstBpm = 0;
         final diff = DateTime.now().difference(_lastBpmReceivedAt!).inSeconds;
         if (_secondsSinceLastBpm != diff) {
           _secondsSinceLastBpm = diff;
           notifyListeners();
         }
         if (_currentMode == Mode.ble) {
+          // Untuk data mining kontinu pada jam fisik (XWatch H4 / Moyoung V2):
+          // Sensor PPG butuh ~15–35 detik untuk lock detak jantung; jangan
+          // mengirim reset/stop terlalu cepat agar siklus pengukuran tidak batal.
+          // - Setiap 45 detik hening: kirim reset (0x00) + stop + start (0x01)
+          // - Setiap 180 detik (3 menit) hening: lakukan GATT reconnect cepat.
+          if (_connectedDevice != null &&
+              _onRetriggerOverride == null &&
+              !_isRecoveringBle &&
+              diff > 0) {
+            if (diff % 180 == 0) {
+              unawaited(_reconnectCurrentDevice());
+            } else if (diff % 45 == 0) {
+              unawaited(_retriggerCurrentDevice());
+            }
+          }
           unawaited(_evaluateBleRecovery(diff));
+        }
+      } else if (_currentMode == Mode.ble && _connectedDevice != null) {
+        _secondsWaitingFirstBpm++;
+        if (!_isRecoveringBle &&
+            _secondsWaitingFirstBpm > 0 &&
+            _secondsWaitingFirstBpm % 35 == 0) {
+          unawaited(_retriggerCurrentDevice());
         }
       }
     });

@@ -59,6 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _hourlyAverages = [];
 
   Timer? _refreshTimer;
+  DateTime? _lastLiveStatsFetchAt;
 
   @override
   void initState() {
@@ -119,8 +120,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onHeartRateUpdate() {
-    if (mounted) {
-      setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    // Saat jam BLE baru saja mengirim paket BPM baru, segarkan grafik & analisis
+    // maksimal tiap 6 detik agar hasil data mining langsung terlihat di Beranda.
+    if (_hrService.currentMode == Mode.ble &&
+        _hrService.secondsSinceLastBpm == 0 &&
+        _activeChild != null &&
+        !_isRetryingAnalysis) {
+      final now = DateTime.now();
+      if (_lastLiveStatsFetchAt == null ||
+          now.difference(_lastLiveStatsFetchAt!).inSeconds >= 6) {
+        _lastLiveStatsFetchAt = now;
+        unawaited(_fetchStatsForChild(_activeChild!.id));
+      }
     }
   }
 
@@ -498,6 +511,34 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
+    // 1b. Mode BLE baru saja terhubung dan jam sedang mengunci detak pertama
+    if (isBleMode &&
+        bleStatus == HrSensorStatus.measuring &&
+        !hasFreshLocalBleReading) {
+      if (hasBackendBpm) {
+        final backendBpm = analysisCurrent!.bpm!;
+        return (
+          effectiveBpm: backendBpm,
+          bpmDisplay: '$backendBpm',
+          statusLabel: _resolveHeartRateStatusLabel(
+            backendStatus: analysisCurrent.status,
+            bpm: backendBpm,
+            baselineSufficient: baselineSufficient,
+            p25: p25,
+            p75: p75,
+            episodeMargin: episodeMargin,
+          ),
+          measurementStateLabel: 'Jam aktif · membaca sensor...',
+        );
+      }
+      return (
+        effectiveBpm: null,
+        bpmDisplay: '--',
+        statusLabel: 'Sedang mengukur',
+        measurementStateLabel: 'Jam aktif · membaca sensor...',
+      );
+    }
+
     // 2. Mode BLE dalam siklus istirahat sensor
     if (isBleMode && bleStatus == HrSensorStatus.resting) {
       if (hasFreshLocalBleReading) {
@@ -610,12 +651,12 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    // Fallback pratinjau simulasi contoh saat belum terhubung ke analisis backend
+    // Saat belum ada data analisis dari backend maupun bacaan BLE
     return (
       effectiveBpm: null,
-      bpmDisplay: '${_hrService.currentBpm}',
-      statusLabel: 'Mode simulasi contoh',
-      measurementStateLabel: 'Simulasi (bukan sensor aktual)',
+      bpmDisplay: '--',
+      statusLabel: 'Menunggu bacaan',
+      measurementStateLabel: 'Menghubungkan ke sensor jam...',
     );
   }
 

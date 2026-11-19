@@ -60,14 +60,14 @@ WatchStatusResolution resolveWatchStatus(
     );
   }
 
-  // b. Mode Dummy (tidak pernah menampilkan Terhubung walau currentBleState connected)
+  // b. Sebelum koneksi BLE aktif
   if (hrService.currentMode == Mode.dummy) {
     return const WatchStatusResolution(
-      state: WatchChipState.simulated,
-      label: 'Simulasi',
-      semanticsLabel: 'Status jam: simulasi',
+      state: WatchChipState.connecting,
+      label: 'Menghubungkan…',
+      semanticsLabel: 'Status jam: menghubungkan',
       sheetDescription:
-          'Menampilkan data simulasi contoh, bukan bacaan langsung dari jam.',
+          'Menyiapkan koneksi Bluetooth ke jam yang terpasang.',
     );
   }
 

@@ -8,17 +8,21 @@ class BleService {
   static const List<int> triggerHrPayload = [
     0xfe, 0xea, 0x20, 0x08, 0xb9, 0x09, 0x01, 0x01
   ];
+  static const List<int> resetHrTriggerPayload = [
+    0xfe, 0xea, 0x20, 0x08, 0xb9, 0x09, 0x01, 0x00
+  ];
   static const List<int> stopHrPayload = [
     0xfe, 0xea, 0x20, 0x07, 0xb9, 0x10, 0x00
   ];
 
   BluetoothDevice? _connectedDevice;
   StreamSubscription<List<int>>? _notifySubscription;
-  StreamSubscription<List<int>>? _feeaNotifySubscription;
+  final List<StreamSubscription<List<int>>> _feeaNotifySubscriptions = [];
   StreamController<int>? _bpmController;
 
   BluetoothCharacteristic? _feeaWriteChar;
-  BluetoothCharacteristic? _feeaNotifyChar;
+  final List<BluetoothCharacteristic> _feeaNotifyChars = [];
+  BluetoothCharacteristic? _hrChar;
 
   BluetoothDevice? get connectedDevice => _connectedDevice;
 
@@ -52,8 +56,14 @@ class BleService {
   /// Cari characteristic write & notify di dalam service 0xFEEA,
   /// berdasarkan PROPERTI (bukan UUID hardcoded, karena UUID persisnya
   /// masih ambigu antara FEE1/FEE2 di device ini).
-  Future<void> _resolveFeeaCharacteristics(BluetoothDevice device) async {
-    List<BluetoothService> services = await device.discoverServices();
+  Future<void> _resolveFeeaCharacteristics(
+    BluetoothDevice device, {
+    List<BluetoothService>? discoveredServices,
+  }) async {
+    _feeaWriteChar = null;
+    _feeaNotifyChars.clear();
+    final List<BluetoothService> services =
+        discoveredServices ?? await device.discoverServices();
 
     BluetoothService? feeaService;
     for (final s in services) {
@@ -69,51 +79,87 @@ class BleService {
     }
 
     for (final c in feeaService.characteristics) {
+      final cUuid = c.uuid.toString().toLowerCase();
       debugPrint(
-        "[BLE][FEEA] Char ${c.uuid} | write=${c.properties.writeWithoutResponse} "
+        "[BLE][FEEA] Char $cUuid | write=${c.properties.writeWithoutResponse || c.properties.write} "
         "notify=${c.properties.notify}",
       );
-      if (c.properties.writeWithoutResponse && _feeaWriteChar == null) {
+      // Prioritaskan fee2 sebagai write char utama Moyoung V2
+      if ((c.properties.writeWithoutResponse || c.properties.write) &&
+          (_feeaWriteChar == null || cUuid.contains('fee2'))) {
         _feeaWriteChar = c;
       }
-      if (c.properties.notify && _feeaNotifyChar == null) {
-        _feeaNotifyChar = c;
+      if (c.properties.notify) {
+        _feeaNotifyChars.add(c);
       }
     }
 
     if (_feeaWriteChar == null) {
       throw Exception(
-        "[BLE] Tidak ketemu characteristic write di service 0xFEEA — "
-        "cek log [BLE][FEEA] di atas buat lihat properti yang kebaca",
+        "[BLE] Tidak ketemu characteristic write di service 0xFEEA",
       );
     }
   }
 
-  /// Panggil ini SEBELUM subscribe ke 0x2A37, supaya jam mulai
-  /// ngukur HR secara realtime (meniru apa yang dilakukan My Health
-  /// pas tombol "Ukur HR" ditap).
-  Future<void> triggerContinuousHrMeasurement(BluetoothDevice device) async {
-    await _resolveFeeaCharacteristics(device);
+  /// Panggil ini untuk memicu jam mengukur HR secara realtime.
+  Future<void> triggerContinuousHrMeasurement(
+    BluetoothDevice device, {
+    List<BluetoothService>? discoveredServices,
+  }) async {
+    await _resolveFeeaCharacteristics(
+      device,
+      discoveredServices: discoveredServices,
+    );
+
+    // Subscribe ke semua notify characteristic di 0xFEEA (fee1 & fee3) lebih dulu
+    // agar handshake Moyoung V2 diterima dengan benar.
+    for (final sub in _feeaNotifySubscriptions) {
+      await sub.cancel();
+    }
+    _feeaNotifySubscriptions.clear();
+
+    for (final notifyChar in _feeaNotifyChars) {
+      try {
+        await notifyChar.setNotifyValue(true);
+        final sub = notifyChar.onValueReceived.listen((value) {
+          debugPrint(
+            "[BLE][FEEA] Notify (${notifyChar.uuid}): ${value.toString()}",
+          );
+          // Paket Moyoung V2 akhir siklus HR di fee3: [0xfe, 0xea, 0x20, 0x06, 0x6d, bpm]
+          if (value.length == 6 &&
+              value[0] == 0xfe &&
+              value[1] == 0xea &&
+              value[4] == 0x6d) {
+            final endBpm = value[5];
+            if (endBpm >= 35 &&
+                endBpm <= 220 &&
+                _bpmController != null &&
+                !_bpmController!.isClosed) {
+              _bpmController!.add(endBpm);
+            }
+          }
+        });
+        _feeaNotifySubscriptions.add(sub);
+      } catch (e) {
+        debugPrint("[BLE][FEEA] Gagal setNotifyValue ${notifyChar.uuid}: $e");
+      }
+    }
 
     debugPrint("[BLE] Mengirim trigger start measurement: $triggerHrPayload");
     await _feeaWriteChar!.write(
-      triggerHrPayload,
-      withoutResponse: true,
+      resetHrTriggerPayload,
+      withoutResponse: _feeaWriteChar!.properties.writeWithoutResponse,
     );
-
-    // Kalau ada notify characteristic di 0xFEEA, subscribe juga
-    // buat jaga-jaga ada handshake/ack yang perlu direspons.
-    if (_feeaNotifyChar != null) {
-      await _feeaNotifyChar!.setNotifyValue(true);
-      _feeaNotifySubscription?.cancel();
-      _feeaNotifySubscription = _feeaNotifyChar!.onValueReceived.listen((value) {
-        debugPrint("[BLE][FEEA] Notify balik: ${value.toString()}");
-      });
-    }
+    await Future.delayed(const Duration(milliseconds: 250));
+    await _feeaWriteChar!.write(
+      triggerHrPayload,
+      withoutResponse: _feeaWriteChar!.properties.writeWithoutResponse,
+    );
   }
 
   /// Kirim ulang command trigger pengukuran HR saat jam masih terhubung
-  /// tetapi berhenti mengirim data sementara.
+  /// tetapi siklus pengukurannya berhenti sementara: kirim OFF (0x00) dulu
+  /// untuk me-reset state machine Moyoung V2, lalu kirim ON (0x01).
   Future<void> retriggerHrMeasurement() async {
     final device = _connectedDevice;
     if (device == null) return;
@@ -121,10 +167,28 @@ class BleService {
       await triggerContinuousHrMeasurement(device);
       return;
     }
-    debugPrint("[BLE] Mengirim re-trigger measurement: $triggerHrPayload");
+    if (_hrChar != null) {
+      try {
+        await _hrChar!.setNotifyValue(true);
+      } catch (_) {}
+    }
+    final withoutResp = _feeaWriteChar!.properties.writeWithoutResponse;
+    debugPrint(
+      "[BLE] Mengirim reset (0x00) lalu re-trigger (0x01) measurement...",
+    );
+    await _feeaWriteChar!.write(
+      resetHrTriggerPayload,
+      withoutResponse: withoutResp,
+    );
+    await Future.delayed(const Duration(milliseconds: 200));
+    await _feeaWriteChar!.write(
+      stopHrPayload,
+      withoutResponse: withoutResp,
+    );
+    await Future.delayed(const Duration(milliseconds: 350));
     await _feeaWriteChar!.write(
       triggerHrPayload,
-      withoutResponse: true,
+      withoutResponse: withoutResp,
     );
   }
 
@@ -171,9 +235,6 @@ class BleService {
       List<BluetoothService> services = await device.discoverServices();
       debugPrint("[BLE] Jumlah service ditemukan: ${services.length}");
 
-      // Trigger pengukuran kontinu via 0xFEEA custom service
-      await triggerContinuousHrMeasurement(device);
-
       BluetoothService? hrService;
       for (var service in services) {
         final uuidStr = service.uuid.toString().toLowerCase();
@@ -184,7 +245,9 @@ class BleService {
       }
 
       if (hrService == null) {
-        throw Exception('Device "${device.platformName.isNotEmpty ? device.platformName : device.remoteId}" tidak mendukung Heart Rate Service (0x180D).');
+        throw Exception(
+          'Device "${device.platformName.isNotEmpty ? device.platformName : device.remoteId}" tidak mendukung Heart Rate Service (0x180D).',
+        );
       }
 
       debugPrint("[BLE] Heart Rate service (0x180D) ketemu!");
@@ -199,7 +262,9 @@ class BleService {
       }
 
       if (hrChar == null) {
-        throw Exception('Heart Rate Measurement Characteristic (0x2A37) tidak ditemukan.');
+        throw Exception(
+          'Heart Rate Measurement Characteristic (0x2A37) tidak ditemukan.',
+        );
       }
 
       debugPrint("[BLE] Subscribing ke Heart Rate Measurement (0x2A37)...");
@@ -208,7 +273,7 @@ class BleService {
         (value) {
           debugPrint('[BLE] Raw bytes: $value, length: ${value.length}');
           int? bpm = _parseHeartRate(value);
-          if (bpm != null) {
+          if (bpm != null && bpm > 0) {
             debugPrint("[BLE] Parsed BPM: $bpm");
             if (_bpmController != null && !_bpmController!.isClosed) {
               _bpmController!.add(bpm);
@@ -223,11 +288,27 @@ class BleService {
         },
       );
 
+      _hrChar = hrChar;
       await hrChar.setNotifyValue(true);
 
-      // Explorasi service & characteristic untuk investigasi suhu tubuh & sensor lain
-      // (dijalankan setelah listener HR utama aktif agar tidak bersaing dengan setup awal)
-      unawaited(exploreServices(services));
+      // Trigger pengukuran kontinu via 0xFEEA custom service SETELAH 0x2A37 siap menerima notifikasi
+      await triggerContinuousHrMeasurement(
+        device,
+        discoveredServices: services,
+      );
+
+      // Kirim penguat trigger setelah 700ms agar jam pasti menangkap perintah start
+      Future.delayed(const Duration(milliseconds: 700), () async {
+        if (_connectedDevice?.remoteId == device.remoteId &&
+            _feeaWriteChar != null) {
+          try {
+            await _feeaWriteChar!.write(
+              triggerHrPayload,
+              withoutResponse: _feeaWriteChar!.properties.writeWithoutResponse,
+            );
+          } catch (_) {}
+        }
+      });
 
     } catch (e) {
       debugPrint("[BLE] Error koneksi BLE: $e");
@@ -244,11 +325,14 @@ class BleService {
       await _notifySubscription?.cancel();
       _notifySubscription = null;
 
-      await _feeaNotifySubscription?.cancel();
-      _feeaNotifySubscription = null;
+      for (final sub in _feeaNotifySubscriptions) {
+        await sub.cancel();
+      }
+      _feeaNotifySubscriptions.clear();
 
       _feeaWriteChar = null;
-      _feeaNotifyChar = null;
+      _feeaNotifyChars.clear();
+      _hrChar = null;
 
       if (_connectedDevice != null) {
         debugPrint("[BLE] Disconnecting dari ${_connectedDevice!.remoteId}...");
@@ -294,6 +378,11 @@ class BleService {
         }
 
         if (notify || indicate) {
+          // JANGAN pernah menyentuh atau meng-unsubscribe characteristic HR utama (2a37)
+          // maupun custom service trigger HR (feea) agar stream BPM tidak terputus!
+          if (cUuid.contains('2a37') || sUuid.contains('feea')) {
+            continue;
+          }
           try {
             await c.setNotifyValue(true);
             final sub = c.onValueReceived.listen((value) {

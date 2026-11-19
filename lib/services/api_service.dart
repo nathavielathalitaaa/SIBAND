@@ -54,7 +54,7 @@ class ApiService {
         'bpm': bpm,
         'device_name': deviceName,
         'device_mac': deviceMac,
-        'recorded_at': DateTime.now().toIso8601String(),
+        'recorded_at': DateTime.now().toUtc().toIso8601String(),
       };
       if (childId != null) {
         payload['child_id'] = childId;
