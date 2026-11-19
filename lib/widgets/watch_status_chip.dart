@@ -495,6 +495,7 @@ class _WatchStatusChipState extends State<WatchStatusChip>
     return Semantics(
       label: resolution.semanticsLabel,
       button: true,
+      excludeSemantics: true,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 150),
         child: Material(
