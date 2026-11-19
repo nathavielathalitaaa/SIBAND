@@ -381,6 +381,11 @@ class ApiService {
       final url = Uri.parse('$baseUrl/children/$childId/event-notes');
 
       final time = (occurredAt ?? DateTime.now()).toUtc();
+      // Kolom event_notes.occurred_at tidak punya cast datetime dan akhiran Z
+      // belum terbukti diterima MySQL; waktu dikirim sebagai UTC.
+      final formattedTime =
+          '${time.year.toString().padLeft(4, '0')}-${time.month.toString().padLeft(2, '0')}-${time.day.toString().padLeft(2, '0')} '
+          '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}:${time.second.toString().padLeft(2, '0')}';
 
       final response = await _client.post(
         url,
@@ -392,7 +397,7 @@ class ApiService {
         body: jsonEncode({
           'type': type,
           if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
-          'occurred_at': time.toIso8601String(),
+          'occurred_at': formattedTime,
         }),
       ).timeout(const Duration(seconds: 15));
 

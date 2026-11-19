@@ -65,7 +65,13 @@ void main() {
       expect(parsed.isBefore(after), isTrue);
     });
 
-    test('createEventNote mengirim occurred_at lokal dalam UTC berakhiran Z', () async {
+    String formatUtcSql(DateTime utc) {
+      final t = utc.toUtc();
+      return '${t.year.toString().padLeft(4, '0')}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')} '
+          '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:${t.second.toString().padLeft(2, '0')}';
+    }
+
+    test('createEventNote mengirim occurred_at lokal dalam UTC format YYYY-MM-DD HH:mm:ss', () async {
       Map<String, dynamic>? capturedBody;
 
       final mockClient = MockClient((http.Request request) async {
@@ -86,11 +92,12 @@ void main() {
       expect(result['success'], isTrue);
       expect(capturedBody, isNotNull);
       final occurredAt = capturedBody!['occurred_at'] as String;
-      expect(occurredAt.endsWith('Z'), isTrue);
-      expect(occurredAt, localTime.toUtc().toIso8601String());
+      expect(occurredAt.contains('Z'), isFalse);
+      expect(occurredAt.contains(' '), isTrue);
+      expect(occurredAt, formatUtcSql(localTime.toUtc()));
     });
 
-    test('createEventNote dengan occurredAt null memakai waktu sekarang dalam UTC berakhiran Z', () async {
+    test('createEventNote dengan occurredAt null memakai waktu sekarang dalam UTC format YYYY-MM-DD HH:mm:ss', () async {
       Map<String, dynamic>? capturedBody;
 
       final mockClient = MockClient((http.Request request) async {
@@ -109,8 +116,10 @@ void main() {
       expect(result['success'], isTrue);
       expect(capturedBody, isNotNull);
       final occurredAt = capturedBody!['occurred_at'] as String;
-      expect(occurredAt.endsWith('Z'), isTrue);
-      final parsed = DateTime.parse(occurredAt);
+      expect(occurredAt.contains('Z'), isFalse);
+      expect(occurredAt.contains(' '), isTrue);
+      expect(RegExp(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$').hasMatch(occurredAt), isTrue);
+      final parsed = DateTime.parse('${occurredAt.replaceFirst(' ', 'T')}Z');
       expect(parsed.isUtc, isTrue);
       expect(parsed.isAfter(before), isTrue);
       expect(parsed.isBefore(after), isTrue);
