@@ -466,10 +466,10 @@
             <p class="desc">Pindai QR langsung dari kamera HP Android atau ketuk tombol di bawah untuk memasang aplikasi.</p>
             <div class="download-flex">
               <div class="qr-box">
-                <canvas id="qr-canvas" width="168" height="168" aria-label="QR Code unduh APK Siband"></canvas>
+                <canvas id="qr-canvas" width="204" height="204" aria-label="QR Code unduh APK Siband"></canvas>
               </div>
               <ol class="mini-steps">
-                <li>Pindai QR ini atau ketuk <strong>Unduh Siband APK</strong>.</li>
+                <li>Pindai QR ini atau ketuk <strong>Unduh Siband APK</strong> (v1.0.0).</li>
                 <li>Buka file yang terunduh dan izinkan pemasangan aplikasi Android.</li>
                 <li>Buka <strong>Siband</strong>, daftar atau masuk akun, lalu sambungkan smartwatch.</li>
               </ol>
@@ -688,8 +688,8 @@
       var ctx = canvas.getContext("2d");
       var matrix = encodeQR(apkUrl);
       var n = matrix.length;
-      var quiet = 3;
-      var scale = Math.max(3, Math.floor(canvas.width / (n + quiet * 2)));
+      var quiet = 4;
+      var scale = Math.max(4, Math.floor(canvas.width / (n + quiet * 2)));
       var dim = (n + quiet * 2) * scale;
       canvas.width = dim;
       canvas.height = dim;

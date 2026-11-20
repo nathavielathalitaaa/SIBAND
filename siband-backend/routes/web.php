@@ -3,15 +3,21 @@
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return response()->file(public_path('landing.html'));
+    return response()->file(public_path('landing.html'), [
+        'Cache-Control' => 'no-cache, no-store, must-revalidate',
+    ]);
 });
 
 Route::get('/share', function () {
-    return response()->file(public_path('share.html'));
+    return response()->file(public_path('share.html'), [
+        'Cache-Control' => 'no-cache, no-store, must-revalidate',
+    ]);
 });
 
 Route::get('/download', function () {
-    return response()->file(public_path('download.html'));
+    return response()->file(public_path('download.html'), [
+        'Cache-Control' => 'no-cache, no-store, must-revalidate',
+    ]);
 });
 
 Route::get('/download/siband.apk', function () {
