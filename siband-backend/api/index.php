@@ -17,8 +17,14 @@ foreach ($tmpDirs as $dir) {
     }
 }
 
-// 2. Sambungkan otomatis DATABASE_URL / POSTGRES_URL dari Vercel Storage (Neon Postgres) ke Laravel DB_URL
-$neonUrl = getenv('DB_URL') ?: getenv('DATABASE_URL') ?: getenv('POSTGRES_URL') ?: '';
+// 2. Sambungkan otomatis env database dari Vercel Storage (Neon Postgres) ke Laravel DB_URL
+$neonUrl = getenv('DB_URL')
+    ?: getenv('DATABASE_URL')
+    ?: getenv('POSTGRES_URL')
+    ?: getenv('STORAGE_DATABASE_URL')
+    ?: getenv('STORAGE_POSTGRES_URL')
+    ?: getenv('STORAGE_URL')
+    ?: '';
 if ($neonUrl !== '') {
     putenv("DB_URL={$neonUrl}");
     $_ENV['DB_URL'] = $neonUrl;
