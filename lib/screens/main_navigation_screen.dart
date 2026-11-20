@@ -70,6 +70,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     final screens = [
       HomeScreen(
         onNavigateToPanduan: () => _onTabSelected(1),
+        onNavigateToRekap: () => _onTabSelected(2),
         initialChildren: widget.initialChildren,
         initialUserName: widget.initialUserName,
         initialErrorMessage: widget.initialErrorMessage,
@@ -119,6 +120,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
         ),
       ),
       bottomNavigationBar: Container(
+        key: const Key('main_bottom_nav_bar'),
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [

@@ -161,8 +161,11 @@ void main() {
         expect(fabWidget.backgroundColor, const Color(0xFFE8A24F));
 
         // Pindah ke tab Panduan, Rekap, Profil -> tombol Catat kejadian tidak ada
+        final navBar = find.byKey(const Key('main_bottom_nav_bar'));
         for (final tabLabel in ['Panduan', 'Rekap', 'Profil']) {
-          await tester.tap(find.text(tabLabel));
+          await tester.tap(
+            find.descendant(of: navBar, matching: find.text(tabLabel)),
+          );
           await tester.pumpAndSettle();
           expect(
             find.byKey(const Key('fab_catat_kejadian'), skipOffstage: false),
@@ -171,7 +174,9 @@ void main() {
         }
 
         // Kembali ke Beranda -> muncul lagi
-        await tester.tap(find.text('Beranda'));
+        await tester.tap(
+          find.descendant(of: navBar, matching: find.text('Beranda')),
+        );
         await tester.pumpAndSettle();
         expect(fabFinder, findsOneWidget);
 

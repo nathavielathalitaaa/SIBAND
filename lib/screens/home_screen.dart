@@ -19,6 +19,7 @@ import 'pattern_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onNavigateToPanduan;
+  final VoidCallback? onNavigateToRekap;
   final List<ChildModel>? initialChildren;
   final String? initialUserName;
   final String? initialErrorMessage;
@@ -31,6 +32,7 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     this.onNavigateToPanduan,
+    this.onNavigateToRekap,
     this.initialChildren,
     this.initialUserName,
     this.initialErrorMessage,
@@ -59,7 +61,6 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _analysisLoadFailed = false;
   String? _errorMessage;
 
-  String _userName = 'Orang Tua';
   AnalysisModel? _analysisData;
   Map<String, dynamic>? _baselineData;
   List<Map<String, dynamic>> _hourlyAverages = [];
@@ -89,9 +90,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _activeChild = _children.first;
         _hrService.setActiveChild(_activeChild!.id);
       }
-    }
-    if (widget.initialUserName != null) {
-      _userName = widget.initialUserName!;
     }
 
     if (widget.initialErrorMessage == null) {
@@ -140,9 +138,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _initData() async {
     final futures = <Future<void>>[];
-    if (widget.initialUserName == null) {
-      futures.add(_fetchUserProfile());
-    }
     if (widget.initialChildren == null) {
       futures.add(_fetchChildren());
     } else {
@@ -183,18 +178,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _isLoadingChildren = true;
     });
     await _initData();
-  }
-
-  Future<void> _fetchUserProfile() async {
-    try {
-      final user = await _apiService.getUserProfile();
-      if (!mounted) return;
-      if (user != null && user['name'] != null) {
-        setState(() {
-          _userName = user['name'].toString();
-        });
-      }
-    } catch (_) {}
   }
 
   Future<void> _fetchChildren() async {
@@ -391,19 +374,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return result;
-  }
-
-  String _getGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour >= 4 && hour < 11) {
-      return 'Selamat Pagi';
-    } else if (hour >= 11 && hour < 15) {
-      return 'Selamat Siang';
-    } else if (hour >= 15 && hour < 18) {
-      return 'Selamat Sore';
-    } else {
-      return 'Selamat Malam';
-    }
   }
 
   /// Format HH:mm dari ISO 8601 string (mempertahankan jam lokal pada offset string seperti +07:00).
@@ -980,6 +950,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final activeChildName = _activeChild?.nickname ?? 'Pilih anak';
 
     return Row(
+      key: const Key('home_header'),
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Flexible(child: _buildLogo()),
@@ -1012,15 +983,20 @@ class _HomeScreenState extends State<HomeScreen> {
                     borderRadius: BorderRadius.circular(20),
                     onTap: _showChildSwitcherSheet,
                     child: Container(
-                      constraints: const BoxConstraints(maxWidth: 130),
+                      constraints: const BoxConstraints(
+                        maxWidth: 130,
+                        minHeight: 36,
+                      ),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Color.alphaBlend(
+                          const Color(0xFFD9DED6).withValues(alpha: 0.35),
+                          const Color(0xFFF6F4EF),
+                        ),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFD9DED6)),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.04),
@@ -1069,48 +1045,26 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildGreeting() {
-    final activeChildName = _activeChild?.nickname ?? 'anak Anda';
+  Widget _buildSummaryChipsRow() {
+    final analysis = _analysisData;
+    if (analysis == null) return const SizedBox.shrink();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '${_getGreeting()}, $_userName',
-          style: GoogleFonts.inter(
-            fontSize: 22,
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFF1E2A24),
-            height: 1.2,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Yuk, lihat kondisi $activeChildName hari ini dan temukan cara terbaik untuk mendukungnya.',
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            fontWeight: FontWeight.w400,
-            color: const Color(0xFF6F7B74),
-            height: 1.35,
-          ),
-        ),
-      ],
-    );
-  }
+    final episodeCount = analysis.episodes.length;
+    final noteCount = analysis.notes.length;
+    final coveragePct = analysis.quality.coveragePercent.round();
 
-  Widget _buildBanner() {
-    return Semantics(
-      label: 'Banner: Yuk Memahami Anak. Ketuk untuk membuka Panduan.',
-      button: true,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () {
-          widget.onNavigateToPanduan?.call();
-        },
+    Widget buildChip({
+      required Key key,
+      required String label,
+      required Color background,
+      required Color textColor,
+    }) {
+      return Expanded(
         child: Container(
-          padding: const EdgeInsets.all(18),
+          key: key,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           decoration: BoxDecoration(
-            color: const Color(0xFFE3EEDF),
+            color: background,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
@@ -1120,50 +1074,168 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Yuk Memahami Anak',
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF1F5C4A),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Kenali pemicu dan pola perilaku anak melalui panduan interaktif kami.',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w400,
-                        color: const Color(0xFF1E2A24),
-                        height: 1.3,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF1F5C4A),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.arrow_forward_rounded,
-                  color: Colors.white,
-                  size: 18,
-                ),
-              ),
-            ],
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: textColor,
+            ),
           ),
         ),
-      ),
+      );
+    }
+
+    return Row(
+      key: const Key('home_summary_chips'),
+      children: [
+        buildChip(
+          key: const Key('summary_chip_episode'),
+          label: 'Episode $episodeCount',
+          background: Color.alphaBlend(
+            const Color(0xFFE8A24F).withValues(alpha: 0.12),
+            const Color(0xFFF6F4EF),
+          ),
+          textColor: const Color(0xFF1E2A24),
+        ),
+        const SizedBox(width: 8),
+        buildChip(
+          key: const Key('summary_chip_catatan'),
+          label: 'Catatan $noteCount',
+          background: Color.alphaBlend(
+            const Color(0xFFD9DED6).withValues(alpha: 0.35),
+            const Color(0xFFF6F4EF),
+          ),
+          textColor: const Color(0xFF1E2A24),
+        ),
+        const SizedBox(width: 8),
+        buildChip(
+          key: const Key('summary_chip_cakupan'),
+          label: 'Cakupan $coveragePct%',
+          background: const Color(0xFFE3EEDF),
+          textColor: const Color(0xFF1F5C4A),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildShortcutRow() {
+    Widget buildShortcut({
+      required Key key,
+      required String title,
+      required String subtitle,
+      required IconData icon,
+      required VoidCallback? onTap,
+    }) {
+      return Expanded(
+        child: Semantics(
+          label: title,
+          button: true,
+          child: Container(
+            key: key,
+            decoration: BoxDecoration(
+              color: Color.alphaBlend(
+                const Color(0xFFD9DED6).withValues(alpha: 0.35),
+                const Color(0xFFF6F4EF),
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(20),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: onTap,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 60),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFE3EEDF),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            icon,
+                            size: 18,
+                            color: const Color(0xFF1F5C4A),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF1E2A24),
+                                ),
+                              ),
+                              Text(
+                                subtitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: const Color(0xFF6F7B74),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      key: const Key('home_shortcut_row'),
+      children: [
+        buildShortcut(
+          key: const Key('home_shortcut_panduan'),
+          title: 'Panduan',
+          subtitle: 'Cara mendampingi',
+          icon: Icons.menu_book_outlined,
+          onTap: () => widget.onNavigateToPanduan?.call(),
+        ),
+        const SizedBox(width: 10),
+        buildShortcut(
+          key: const Key('home_shortcut_rekap'),
+          title: 'Rekap',
+          subtitle: 'Ringkasan bulanan',
+          icon: Icons.bar_chart_rounded,
+          onTap: () => widget.onNavigateToRekap?.call(),
+        ),
+      ],
     );
   }
 
@@ -1248,13 +1320,21 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Container(
+      key: const Key('home_bpm_card'),
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: const Color(0xFF1F5C4A),
-        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF1F5C4A),
+            const Color(0xFF1F5C4A).withValues(alpha: 0.85),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1F5C4A).withValues(alpha: 0.25),
+            color: const Color(0xFF1F5C4A).withValues(alpha: 0.22),
             blurRadius: 14,
             offset: const Offset(0, 4),
           ),
@@ -1442,6 +1522,45 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ] else if (_hrService.activeDeviceId == null ||
+              _hrService.pairedDeviceName == null) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton.icon(
+                key: const Key('home_pair_watch_action'),
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PairDeviceScreen(
+                        childId: _activeChild?.id,
+                        childNickname: _activeChild?.nickname,
+                      ),
+                    ),
+                  );
+                  if (mounted && _activeChild != null) {
+                    _fetchStatsForChild(_activeChild!.id);
+                  }
+                },
+                icon: const Icon(Icons.watch_outlined, size: 18),
+                label: Text(
+                  'Pasang jam',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: BorderSide(color: Colors.white.withValues(alpha: 0.45)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
                   ),
                 ),
               ),
@@ -1648,9 +1767,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final remainingCount = episodes.length - visibleEpisodes.length;
 
     return Container(
+      key: const Key('home_episodes_card'),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Color.alphaBlend(
+          const Color(0xFFE8A24F).withValues(alpha: 0.12),
+          const Color(0xFFF6F4EF),
+        ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -1683,7 +1806,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 decoration: BoxDecoration(
                   color: episodes.isNotEmpty
-                      ? const Color(0xFFE8A24F).withValues(alpha: 0.18)
+                      ? const Color(0xFFE8A24F).withValues(alpha: 0.25)
                       : const Color(0xFFE3EEDF),
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -1693,7 +1816,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: episodes.isNotEmpty
-                        ? const Color(0xFFB45309)
+                        ? const Color(0xFF1E2A24)
                         : const Color(0xFF1F5C4A),
                   ),
                 ),
@@ -1747,8 +1870,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF6F4EF),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE5E0D5)),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1773,7 +1895,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFE8A24F)
-                                  .withValues(alpha: 0.2),
+                                  .withValues(alpha: 0.25),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
@@ -1781,7 +1903,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               style: GoogleFonts.inter(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
-                                color: const Color(0xFFB45309),
+                                color: const Color(0xFF1E2A24),
                               ),
                             ),
                           ),
@@ -2092,7 +2214,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 10),
         Text(
-          'Perubahan detak jantung bukan bukti stres.',
+          'Detak jantung naik bisa dipicu banyak hal.',
           textAlign: TextAlign.center,
           style: GoogleFonts.inter(
             fontSize: 12,
@@ -2180,14 +2302,14 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Container(
               padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Color(0xFFFFEBEE),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8A24F).withValues(alpha: 0.16),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.error_outline_rounded,
                 size: 54,
-                color: Colors.redAccent,
+                color: Color(0xFFE8A24F),
               ),
             ),
             const SizedBox(height: 20),
@@ -2315,28 +2437,30 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Header
+                        // 1. Header tipis (logo + chip jam + nama anak)
                         _buildHeader(),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 16),
 
-                        // Sapaan
-                        _buildGreeting(),
-                        const SizedBox(height: 18),
-
-                        // Banner Yuk Memahami Anak
-                        _buildBanner(),
-                        const SizedBox(height: 18),
-
-                        // Kartu Hijau PEMANTAUAN DETAK JANTUNG (Kartu Detak Jantung Sekarang)
+                        // 2. Kartu BPM utama (gradien hijau tua -> 85%, putih, denyut)
                         _buildMonitoringCard(),
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 14),
 
-                        // Grafik Pemantauan Time-Series BPM
-                        HomeMonitoringChartCard(
-                          analysisData: _analysisData,
-                          baselineData: _baselineData,
-                          hourlyAverages: _hourlyAverages,
-                          isLoadingAnalysis: _isLoadingAnalysis,
+                        // 3. Tiga chip ringkas (Episode, Catatan, Cakupan)
+                        if (_analysisData != null) ...[
+                          _buildSummaryChipsRow(),
+                          const SizedBox(height: 18),
+                        ] else
+                          const SizedBox(height: 4),
+
+                        // 4. Grafik Pemantauan Time-Series BPM
+                        Container(
+                          key: const Key('home_chart_section'),
+                          child: HomeMonitoringChartCard(
+                            analysisData: _analysisData,
+                            baselineData: _baselineData,
+                            hourlyAverages: _hourlyAverages,
+                            isLoadingAnalysis: _isLoadingAnalysis,
+                          ),
                         ),
                         if (_analysisLoadFailed) ...[
                           const SizedBox(height: 8),
@@ -2344,7 +2468,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                         const SizedBox(height: 18),
 
-                        // Ringkasan Episode Kenaikan BPM yang ringkas (jika data analisis tersedia)
+                        // 5 & 6. Ringkasan Episode + Kartu Lihat Pola
                         if (_analysisData != null) ...[
                           _buildEpisodesSummaryCard(),
                           const SizedBox(height: 14),
@@ -2353,7 +2477,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         ] else
                           const SizedBox(height: 2),
 
-                        // Tombol + Catatan kejadian dan teks keterangan
+                        // 7. Baris pintasan dua tombol (Panduan & Rekap)
+                        _buildShortcutRow(),
+                        const SizedBox(height: 16),
+
+                        // Tombol + Catatan kejadian (tetap ada di bawah halaman)
                         _buildEventNoteButton(),
                         const SizedBox(height: 16),
                       ],
@@ -2407,26 +2535,43 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildAnalysisErrorNotice() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: Color.alphaBlend(
+          const Color(0xFFD9DED6).withValues(alpha: 0.35),
+          const Color(0xFFF6F4EF),
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.info_outline_rounded,
-            size: 16,
-            color: Color(0xFF64748B),
+          Container(
+            width: 28,
+            height: 28,
+            decoration: const BoxDecoration(
+              color: Color(0xFFE3EEDF),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.info_outline_rounded,
+              size: 16,
+              color: Color(0xFF1F5C4A),
+            ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               'Data analisis belum bisa dimuat',
               style: GoogleFonts.inter(
                 fontSize: 12,
-                color: const Color(0xFF64748B),
+                color: const Color(0xFF6F7B74),
               ),
             ),
           ),
