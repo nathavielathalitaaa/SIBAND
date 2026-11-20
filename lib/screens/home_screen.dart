@@ -1823,7 +1823,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFE2E8F0),
+                              color: const Color(0xFFD9DED6),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
@@ -1831,7 +1831,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               style: GoogleFonts.inter(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w500,
-                                color: const Color(0xFF475569),
+                                color: const Color(0xFF6F7B74),
                               ),
                             ),
                           ),
@@ -2260,8 +2260,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: FloatingActionButton.extended(
                       key: const Key('fab_catat_kejadian'),
                       heroTag: null,
-                      backgroundColor: const Color(0xFF1F5C4A),
-                      foregroundColor: Colors.white,
+                      backgroundColor: const Color(0xFFE8A24F),
+                      foregroundColor: const Color(0xFF1E2A24),
                       elevation: 3,
                       onPressed: () async {
                         final child = _activeChild;
@@ -2283,7 +2283,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         style: GoogleFonts.inter(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                          color: const Color(0xFF1E2A24),
                         ),
                       ),
                     ),

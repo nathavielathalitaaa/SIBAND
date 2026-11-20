@@ -156,6 +156,9 @@ void main() {
         final fabFinder = find.byKey(const Key('fab_catat_kejadian'));
         expect(fabFinder, findsOneWidget);
         expect(find.text('Catat kejadian'), findsOneWidget);
+        // Aksi catat berwarna amber (palet proyek), bukan hijau aksi utama
+        final fabWidget = tester.widget<FloatingActionButton>(fabFinder);
+        expect(fabWidget.backgroundColor, const Color(0xFFE8A24F));
 
         // Pindah ke tab Panduan, Rekap, Profil -> tombol Catat kejadian tidak ada
         for (final tabLabel in ['Panduan', 'Rekap', 'Profil']) {
