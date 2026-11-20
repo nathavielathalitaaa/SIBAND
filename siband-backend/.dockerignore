@@ -1,0 +1,10 @@
+.git
+.env
+.env.*
+vendor/
+node_modules/
+storage/logs/*.log
+storage/app/backups/
+public/downloads/*.apk
+tests/
+phpunit.xml

@@ -1,0 +1,43 @@
+databases:
+  - name: siband-db
+    plan: free
+    region: singapore
+    databaseName: siband
+    user: siband
+
+services:
+  - type: web
+    name: siband-api
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./siband-backend/Dockerfile
+    dockerContext: ./siband-backend
+    healthCheckPath: /up
+    envVars:
+      - key: APP_NAME
+        value: Siband
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        generateValue: true
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: LOG_LEVEL
+        value: info
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_URL
+        fromDatabase:
+          name: siband-db
+          property: connectionString
+      - key: SESSION_DRIVER
+        value: cookie
+      - key: CACHE_STORE
+        value: database
+      - key: QUEUE_CONNECTION
+        value: sync
+      - key: APK_DOWNLOAD_URL
+        value: ""
