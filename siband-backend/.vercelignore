@@ -1,0 +1,12 @@
+.git
+.env
+.env.*
+node_modules/
+storage/logs/*.log
+storage/app/backups/
+public/downloads/*.apk
+tests/
+phpunit.xml
+Dockerfile
+.dockerignore
+docker-entrypoint.sh
