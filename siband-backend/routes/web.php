@@ -23,7 +23,10 @@ Route::get('/download/siband.apk', function () {
         ]);
     }
 
-    $externalApkUrl = trim((string) env('APK_DOWNLOAD_URL', ''));
+    $externalApkUrl = trim((string) env(
+        'APK_DOWNLOAD_URL',
+        'https://github.com/nathavielathalitaaa/SIBAND/releases/download/v1.0.0/app-release.apk',
+    ));
     if ($externalApkUrl !== '' && preg_match('#^https?://#i', $externalApkUrl)) {
         return redirect()->away($externalApkUrl);
     }
