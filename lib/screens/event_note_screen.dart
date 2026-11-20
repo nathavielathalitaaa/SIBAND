@@ -9,11 +9,13 @@ import 'onboarding_screen.dart';
 class EventNoteScreen extends StatefulWidget {
   final int childId;
   final String initialType;
+  final DateTime? initialOccurredAt;
 
   const EventNoteScreen({
     super.key,
     required this.childId,
     this.initialType = 'suara_keras',
+    this.initialOccurredAt,
   });
 
   @override
@@ -24,7 +26,7 @@ class _EventNoteScreenState extends State<EventNoteScreen> {
   final ApiService _apiService = ApiService();
   final TextEditingController _noteController = TextEditingController();
 
-  DateTime _selectedDateTime = DateTime.now();
+  late DateTime _selectedDateTime;
   late String _selectedType;
   bool _isSubmitting = false;
 
@@ -34,6 +36,16 @@ class _EventNoteScreenState extends State<EventNoteScreen> {
   void initState() {
     super.initState();
     _selectedType = widget.initialType;
+    final now = DateTime.now();
+    final minDate = now.subtract(const Duration(days: 30));
+    final maxDate = now.add(const Duration(days: 1));
+    DateTime resolved = (widget.initialOccurredAt ?? now).toLocal();
+    if (resolved.isBefore(minDate)) {
+      resolved = minDate;
+    } else if (resolved.isAfter(maxDate)) {
+      resolved = maxDate;
+    }
+    _selectedDateTime = resolved;
   }
 
   @override

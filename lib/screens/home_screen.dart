@@ -13,6 +13,7 @@ import '../widgets/home_monitoring_chart_card.dart';
 import '../widgets/thin_line_logo.dart';
 import '../widgets/watch_status_chip.dart';
 import 'event_note_screen.dart';
+import 'guide_calming_screen.dart';
 import 'pair_device_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -24,6 +25,7 @@ class HomeScreen extends StatefulWidget {
   final AnalysisModel? initialAnalysisData;
   final ApiService? apiService;
   final HeartRateService? heartRateService;
+  final bool isActiveTab;
 
   const HomeScreen({
     super.key,
@@ -35,6 +37,7 @@ class HomeScreen extends StatefulWidget {
     this.initialAnalysisData,
     this.apiService,
     this.heartRateService,
+    this.isActiveTab = true,
   });
 
   @override
@@ -105,6 +108,13 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void didUpdateWidget(covariant HomeScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.initialChildren != oldWidget.initialChildren &&
+        widget.initialChildren != null) {
+      setState(() {
+        _children = widget.initialChildren!;
+        _activeChild = _children.isNotEmpty ? _children.first : null;
+      });
+    }
     if (widget.initialAnalysisData != oldWidget.initialAnalysisData &&
         widget.initialAnalysisData != null) {
       setState(() {
@@ -1777,41 +1787,96 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                       const SizedBox(height: 4),
+                    if (note != null)
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Icon(
-                            note != null
-                                ? getEventTypeIcon(note.type)
-                                : Icons.info_outline_rounded,
+                            getEventTypeIcon(note.type),
                             size: 14,
-                            color: note != null
-                                ? const Color(0xFF1F5C4A)
-                                : const Color(0xFF6F7B74),
+                            color: const Color(0xFF1F5C4A),
                           ),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
-                              note != null
-                                  ? '${getEventTypeName(note.type)}${note.textPreview.isNotEmpty ? ' · ${note.textPreview}' : ''}'
-                                  : 'Tanpa catatan kejadian terkait',
+                              '${getEventTypeName(note.type)}${note.textPreview.isNotEmpty ? ' · ${note.textPreview}' : ''}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.inter(
                                 fontSize: 11,
-                                fontWeight: note != null
-                                    ? FontWeight.w600
-                                    : FontWeight.w400,
-                                color: note != null
-                                    ? const Color(0xFF1E2A24)
-                                    : const Color(0xFF6F7B74),
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF1E2A24),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    else
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE2E8F0),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'Belum dicatat',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: const Color(0xFF475569),
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _activeChild == null
+                                ? null
+                                : () async {
+                                    final childId = _activeChild!.id;
+                                    final parsedStart =
+                                        DateTime.tryParse(ep.start)?.toLocal();
+                                    final result = await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => EventNoteScreen(
+                                          childId: childId,
+                                          initialOccurredAt: parsedStart,
+                                        ),
+                                      ),
+                                    );
+                                    if (result == true &&
+                                        _activeChild != null) {
+                                      _fetchStatsForChild(_activeChild!.id);
+                                    }
+                                  },
+                            style: TextButton.styleFrom(
+                              foregroundColor: const Color(0xFF1F5C4A),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: Text(
+                              'Tambah catatan',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
                         ],
                       ),
-                    ],
-                  ),
+                  ],
+                ),
                 ),
               );
             }),
@@ -1827,6 +1892,38 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ],
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => GuideCalmingScreen(
+                      childId: _activeChild?.id,
+                    ),
+                  ),
+                );
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF1F5C4A),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(
+                'Lihat panduan menenangkan',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -2095,60 +2192,103 @@ class _HomeScreenState extends State<HomeScreen> {
           builder: (context, constraints) {
             final horizontalPadding = constraints.maxWidth * 0.06;
 
-            return RefreshIndicator(
-              color: const Color(0xFF1F5C4A),
-              onRefresh: _handlePullToRefresh,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.symmetric(
-                  horizontal: horizontalPadding,
-                  vertical: 16,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Header
-                    _buildHeader(),
-                    const SizedBox(height: 20),
-
-                    // Sapaan
-                    _buildGreeting(),
-                    const SizedBox(height: 18),
-
-                    // Banner Yuk Memahami Anak
-                    _buildBanner(),
-                    const SizedBox(height: 18),
-
-                    // Kartu Hijau PEMANTAUAN DETAK JANTUNG (Kartu Detak Jantung Sekarang)
-                    _buildMonitoringCard(),
-                    const SizedBox(height: 18),
-
-                    // Grafik Pemantauan Time-Series BPM
-                    HomeMonitoringChartCard(
-                      analysisData: _analysisData,
-                      baselineData: _baselineData,
-                      hourlyAverages: _hourlyAverages,
-                      isLoadingAnalysis: _isLoadingAnalysis,
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: RefreshIndicator(
+                    color: const Color(0xFF1F5C4A),
+                    onRefresh: _handlePullToRefresh,
+                    child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.fromLTRB(
+                      horizontalPadding,
+                      16,
+                      horizontalPadding,
+                      88,
                     ),
-                    if (_analysisLoadFailed) ...[
-                      const SizedBox(height: 8),
-                      _buildAnalysisErrorNotice(),
-                    ],
-                    const SizedBox(height: 18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Header
+                        _buildHeader(),
+                        const SizedBox(height: 20),
 
-                    // Ringkasan Episode Kenaikan BPM yang ringkas (jika data analisis tersedia)
-                    if (_analysisData != null) ...[
-                      _buildEpisodesSummaryCard(),
-                      const SizedBox(height: 18),
-                    ] else
-                      const SizedBox(height: 2),
+                        // Sapaan
+                        _buildGreeting(),
+                        const SizedBox(height: 18),
 
-                    // Tombol + Catatan kejadian dan teks keterangan
-                    _buildEventNoteButton(),
-                    const SizedBox(height: 16),
-                  ],
+                        // Banner Yuk Memahami Anak
+                        _buildBanner(),
+                        const SizedBox(height: 18),
+
+                        // Kartu Hijau PEMANTAUAN DETAK JANTUNG (Kartu Detak Jantung Sekarang)
+                        _buildMonitoringCard(),
+                        const SizedBox(height: 18),
+
+                        // Grafik Pemantauan Time-Series BPM
+                        HomeMonitoringChartCard(
+                          analysisData: _analysisData,
+                          baselineData: _baselineData,
+                          hourlyAverages: _hourlyAverages,
+                          isLoadingAnalysis: _isLoadingAnalysis,
+                        ),
+                        if (_analysisLoadFailed) ...[
+                          const SizedBox(height: 8),
+                          _buildAnalysisErrorNotice(),
+                        ],
+                        const SizedBox(height: 18),
+
+                        // Ringkasan Episode Kenaikan BPM yang ringkas (jika data analisis tersedia)
+                        if (_analysisData != null) ...[
+                          _buildEpisodesSummaryCard(),
+                          const SizedBox(height: 18),
+                        ] else
+                          const SizedBox(height: 2),
+
+                        // Tombol + Catatan kejadian dan teks keterangan
+                        _buildEventNoteButton(),
+                        const SizedBox(height: 16),
+                      ],
+                    ),
+                    ),
+                  ),
                 ),
-              ),
+                if (widget.isActiveTab && _activeChild != null)
+                  Positioned(
+                    right: 16,
+                    bottom: 16,
+                    child: FloatingActionButton.extended(
+                      key: const Key('fab_catat_kejadian'),
+                      heroTag: null,
+                      backgroundColor: const Color(0xFF1F5C4A),
+                      foregroundColor: Colors.white,
+                      elevation: 3,
+                      onPressed: () async {
+                        final child = _activeChild;
+                        if (child == null) return;
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                EventNoteScreen(childId: child.id),
+                          ),
+                        );
+                        if (result == true && _activeChild != null) {
+                          _fetchStatsForChild(_activeChild!.id);
+                        }
+                      },
+                      icon: const Icon(Icons.add_rounded, size: 20),
+                      label: Text(
+                        'Catat kejadian',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             );
           },
         ),

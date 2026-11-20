@@ -5,7 +5,6 @@ import '../models/child_model.dart';
 import '../widgets/thin_line_logo.dart';
 import 'guide_screen.dart';
 import 'home_screen.dart';
-import 'location_screen.dart';
 import 'profile_screen.dart';
 import 'recap_screen.dart';
 
@@ -75,13 +74,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
         initialUserName: widget.initialUserName,
         initialErrorMessage: widget.initialErrorMessage,
         onFetchChildren: widget.onFetchChildren,
+        isActiveTab: _currentIndex == 0,
       ),
       const GuideScreen(),
       RecapScreen(
         initialChildren: widget.initialChildren,
-      ),
-      LocationScreen(
-        onBackToHome: () => _onTabSelected(0),
       ),
       ProfileScreen(
         onChildrenChanged: () {
@@ -95,7 +92,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
       {'label': 'Beranda', 'type': ThinLineNavType.home},
       {'label': 'Panduan', 'type': ThinLineNavType.guide},
       {'label': 'Rekap', 'type': ThinLineNavType.recap},
-      {'label': 'GPS', 'type': ThinLineNavType.location},
       {'label': 'Profil', 'type': ThinLineNavType.profile},
     ];
 
