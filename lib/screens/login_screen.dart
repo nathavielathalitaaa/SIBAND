@@ -186,43 +186,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: Semantics(
-                              label: 'Atur server',
-                              button: true,
-                              child: TextButton.icon(
-                                onPressed: _showServerConfigDialog,
-                                icon: const Icon(
-                                  Icons.dns_outlined,
-                                  size: 16,
-                                  color: Color(0xFF1F5C4A),
-                                ),
-                                label: Text(
-                                  'Atur server',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF1F5C4A),
-                                  ),
-                                ),
-                                style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 6,
-                                  ),
-                                  minimumSize: const Size(0, 36),
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  backgroundColor: const Color(0xFFE3EEDF),
-                                  shape: const StadiumBorder(),
-                                ),
-                              ),
+                          SizedBox(height: height * 0.20),
+                          // Long-press logo membuka pengaturan server tersembunyi untuk tim saat gladi/demo.
+                          Center(
+                            child: GestureDetector(
+                              onLongPress: _showServerConfigDialog,
+                              child: const SibandLogo(size: 56),
                             ),
                           ),
-                          SizedBox(height: (height * 0.12).clamp(16.0, 96.0)),
-                          // Sementara, ganti dengan logo dari desain tim.
-                          const Center(child: SibandLogo(size: 56)),
                           const SizedBox(height: 16),
 
                           // Judul

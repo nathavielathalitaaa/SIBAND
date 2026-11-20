@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:siband/screens/login_screen.dart';
 import 'package:siband/screens/register_screen.dart';
 import 'package:siband/services/config_service.dart';
+import 'package:siband/widgets/siband_logo.dart';
 
 void main() {
   Widget buildTestable(Widget child, {Size size = const Size(412, 915)}) {
@@ -93,12 +94,14 @@ void main() {
       expect(ConfigService.normalizeApiBaseUrl('https://siband.id/api/'), 'https://siband.id/api');
     });
 
-    testWidgets('Tombol Atur server di LoginScreen menyimpan alamat server yang dinormalkan', (tester) async {
+    testWidgets('LoginScreen menyembunyikan tombol server dari UI normal dan hanya terbuka lewat tekan-tahan logo', (tester) async {
       SharedPreferences.setMockInitialValues({});
       await tester.pumpWidget(buildTestable(const LoginScreen()));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Atur server'));
+      expect(find.text('Atur server'), findsNothing);
+
+      await tester.longPress(find.byType(SibandLogo));
       await tester.pumpAndSettle();
 
       expect(find.text('Atur alamat server'), findsOneWidget);

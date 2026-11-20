@@ -158,32 +158,23 @@
         </svg>
       </div>
       <h1>Unduh Siband APK</h1>
-      <p>Paket rilis Android (<code>id.siband.app</code>) siap pasang langsung di router lokal maupun internet.</p>
+      <p>Aplikasi pendamping pemantauan detak jantung dan jurnal kejadian harian anak.</p>
     </div>
 
     <div class="card">
       <div class="qr-box">
         <canvas id="qr-canvas" width="220" height="220" aria-label="QR Code unduh APK Siband"></canvas>
       </div>
-      <p class="caption">Pindai QR ini dari kamera HP Android untuk langsung mengunduh file APK.</p>
+      <p class="caption">Pindai QR ini dari kamera HP Android untuk langsung mengunduh aplikasi Siband.</p>
       <a class="btn" id="apk-link" href="/download/siband.apk">Unduh Siband APK</a>
-      <div class="note" id="url-preview"></div>
-    </div>
-
-    <div class="server-box">
-      <div class="server-label">Alamat server API untuk halaman Login (ketuk "Atur server" di aplikasi):</div>
-      <div class="server-row">
-        <span class="server-url" id="api-url"></span>
-        <button class="copy-btn" type="button" id="copy-api">Salin</button>
-      </div>
     </div>
 
     <div class="card">
-      <strong style="display:block;margin-bottom:10px;font-size:14.5px;">Langkah pasang &amp; login (3 langkah)</strong>
+      <strong style="display:block;margin-bottom:10px;font-size:14.5px;">Cara pasang (3 langkah singkat)</strong>
       <ol class="steps">
-        <li>Pindai QR di atas atau ketuk <strong>Unduh Siband APK</strong>, lalu izinkan pemasangan aplikasi dari browser bila diminta Android.</li>
-        <li>Buka aplikasi <strong>Siband</strong>. Jika server menggunakan IP router lokal, ketuk tombol <strong>Atur server</strong> di pojok kanan atas layar Login lalu tempel alamat API di atas.</li>
-        <li>Masukkan email dan kata sandi akun untuk langsung masuk ke Beranda.</li>
+        <li>Pindai QR di atas atau ketuk <strong>Unduh Siband APK</strong>.</li>
+        <li>Buka file yang terunduh dan izinkan pemasangan aplikasi bila diminta Android.</li>
+        <li>Buka aplikasi <strong>Siband</strong> lalu masuk dengan akun Anda.</li>
       </ol>
     </div>
   </div>
@@ -386,20 +377,8 @@
 
       var origin = window.location.origin;
       var apkUrl = origin + "/download/siband.apk";
-      var apiUrl = origin + "/api";
 
       document.getElementById("apk-link").href = apkUrl;
-      document.getElementById("api-url").textContent = apiUrl;
-      document.getElementById("url-preview").textContent = "Tautan unduh: " + apkUrl;
-
-      document.getElementById("copy-api").addEventListener("click", function () {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(apiUrl).then(function () {
-            document.getElementById("copy-api").textContent = "Tersalin";
-            setTimeout(function () { document.getElementById("copy-api").textContent = "Salin"; }, 1800);
-          });
-        }
-      });
 
       var canvas = document.getElementById("qr-canvas");
       var ctx = canvas.getContext("2d");
