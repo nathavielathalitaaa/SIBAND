@@ -476,7 +476,7 @@ class _BpmDashboardScreenState extends State<BpmDashboardScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('CalmiBand Monitor'),
+        title: const Text('Siband Monitor'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
           IconButton(

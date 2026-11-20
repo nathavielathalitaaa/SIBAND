@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 enum ThinLineNavType { home, guide, recap, location, profile }
 
-/// Logo CalmiBand / Siband bergaya SVG garis tipis (monoline stroke).
+/// Logo Siband bergaya SVG garis tipis (monoline stroke).
 class SibandThinLineLogo extends StatelessWidget {
   final double size;
   final Color color;
@@ -35,7 +35,7 @@ class SibandThinLineLogo extends StatelessWidget {
         const SizedBox(width: 8),
         Flexible(
           child: Text(
-            'CalmiBand',
+            'Siband',
             overflow: TextOverflow.ellipsis,
             maxLines: 1,
             style: GoogleFonts.inter(

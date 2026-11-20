@@ -1,4 +1,4 @@
-package com.example.siband
+package id.siband.app
 
 import io.flutter.embedding.android.FlutterActivity
 
