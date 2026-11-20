@@ -1,4 +1,7 @@
+import 'package:flutter/services.dart';
 import '../services/config_service.dart';
+
+const MethodChannel _shareChannel = MethodChannel('id.siband.app/share');
 
 /// Ekstraksi origin dari baseUrl dengan menghapus akhiran '/api' dan trailing slash.
 String extractOrigin(String baseUrl) {
@@ -24,18 +27,64 @@ Future<String> shareUrl(String token, {ConfigService? configService}) async {
   return '$origin/share#$token';
 }
 
-/// Format teks ringkas berisi tautan, kode akses, dan PIN (bila ada) untuk dikirim ke terapis.
-String formatTherapistShareBundle({
+/// Format pesan ramah untuk membagikan tautan & kode akses (tanpa PIN) ke terapis.
+String formatTherapistShareMessage({
   required String url,
+  String? childName,
   String? shortCode,
-  String? pin,
+  bool hasPin = false,
 }) {
-  final lines = <String>['Rekap Siband untuk terapis:', url];
+  final trimmedName = childName?.trim() ?? '';
+  final headline = trimmedName.isNotEmpty
+      ? 'Berita informasi terakhir tentang $trimmedName!'
+      : 'Berita informasi terakhir dari Siband!';
+  final intro = trimmedName.isNotEmpty
+      ? 'Berikut tautan rekap pemantauan terbaru $trimmedName dari Siband:'
+      : 'Berikut tautan rekap pemantauan terbaru dari Siband:';
+
+  final lines = <String>[
+    headline,
+    '',
+    intro,
+    url,
+  ];
   if (shortCode != null && shortCode.trim().isNotEmpty) {
+    lines.add('');
     lines.add('Kode akses: ${shortCode.trim()}');
   }
-  if (pin != null && pin.trim().isNotEmpty) {
-    lines.add('PIN: ${pin.trim()}');
+  if (hasPin) {
+    lines.add('Tautan ini dilindungi PIN yang akan dikirim secara terpisah.');
   }
   return lines.join('\n');
+}
+
+/// Format pesan PIN terpisah agar keamanan akses rekap tetap terjaga.
+String formatTherapistPinMessage({
+  required String pin,
+  String? childName,
+}) {
+  final trimmedName = childName?.trim() ?? '';
+  final trimmedPin = pin.trim();
+  if (trimmedName.isNotEmpty) {
+    return 'PIN akses rekap $trimmedName di Siband: $trimmedPin';
+  }
+  return 'PIN akses rekap Siband: $trimmedPin';
+}
+
+/// Membuka lembar berbagi bawaan sistem (Android Share Sheet).
+/// Mengembalikan `true` jika lembar berbagi sistem terbuka, atau `false` jika fallback ke clipboard.
+Future<bool> shareTextNative(String text, {String? subject}) async {
+  try {
+    final result = await _shareChannel.invokeMethod<bool>('shareText', {
+      'text': text,
+      'subject': subject,
+    });
+    if (result == true) return true;
+  } on MissingPluginException {
+    // Fallback ke clipboard pada desktop/test yang tidak memiliki channel Android.
+  } on PlatformException {
+    // Fallback ke clipboard jika share sheet gagal dibuka.
+  }
+  await Clipboard.setData(ClipboardData(text: text));
+  return false;
 }

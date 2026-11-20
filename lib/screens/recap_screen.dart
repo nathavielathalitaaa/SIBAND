@@ -14,6 +14,7 @@ class RecapScreen extends StatefulWidget {
   final List<Map<String, dynamic>>? initialShareLinks;
   final int? activeChildId;
   final ApiService? apiService;
+  final Future<bool> Function(String text, {String? subject})? onShareText;
 
   const RecapScreen({
     super.key,
@@ -22,6 +23,7 @@ class RecapScreen extends StatefulWidget {
     this.initialShareLinks,
     this.activeChildId,
     this.apiService,
+    this.onShareText,
   });
 
   @override
@@ -352,16 +354,21 @@ class _RecapScreenState extends State<RecapScreen> {
     bool isSubmitting = false;
     String? sheetError;
 
+    final shareFn = widget.onShareText ?? shareTextNative;
+
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF6F4EF),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetContext) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
+            final hasCreatedPin = createdPin != null && createdPin!.isNotEmpty;
+            final childName = _activeChild?.nickname ?? '';
+
             return Padding(
               padding: EdgeInsets.only(
                 left: 24,
@@ -369,310 +376,465 @@ class _RecapScreenState extends State<RecapScreen> {
                 top: 20,
                 bottom: MediaQuery.of(context).viewInsets.bottom + 24,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFCBD5E1),
-                        borderRadius: BorderRadius.circular(2),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFD9DED6),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 18),
-                  Text(
-                    'Buat Tautan Berbagi',
-                    style: GoogleFonts.inter(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF1E2A24),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Pilih masa berlaku tautan rekap untuk terapis anak.',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      color: const Color(0xFF6F7B74),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  if (createdUrl == null) ...[
-                    // Pilihan Masa Berlaku (1, 7, 14, 30 hari)
+                    const SizedBox(height: 18),
                     Text(
-                      'Masa berlaku:',
+                      'Buat Tautan Berbagi',
                       style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
                         color: const Color(0xFF1E2A24),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 10,
-                      children: [1, 7, 14, 30].map((days) {
-                        final isSel = selectedDays == days;
-                        return ChoiceChip(
-                          label: Text('$days Hari'),
-                          selected: isSel,
-                          selectedColor: const Color(0xFFE3EEDF),
-                          backgroundColor: Colors.white,
-                          labelStyle: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: isSel ? FontWeight.w600 : FontWeight.w500,
-                            color: isSel ? const Color(0xFF1F5C4A) : const Color(0xFF6F7B74),
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(
-                              color: isSel ? const Color(0xFF1F5C4A) : const Color(0xFFE2E8F0),
-                            ),
-                          ),
-                          onSelected: (val) {
-                            if (val) {
-                              setSheetState(() => selectedDays = days);
-                            }
-                          },
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF6F4EF),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Lindungi dengan PIN 6 digit',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF1E2A24),
-                                  ),
-                                ),
-                                Text(
-                                  'Terapis memasukkan PIN untuk membuka rekap',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    color: const Color(0xFF6F7B74),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Switch(
-                            value: usePin,
-                            activeTrackColor: const Color(0xFF1F5C4A),
-                            onChanged: isSubmitting
-                                ? null
-                                : (val) => setSheetState(() => usePin = val),
-                          ),
-                        ],
+                    const SizedBox(height: 6),
+                    Text(
+                      'Pilih masa berlaku tautan rekap untuk terapis anak.',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: const Color(0xFF6F7B74),
                       ),
                     ),
-                    if (sheetError != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        sheetError!,
-                        style: GoogleFonts.inter(fontSize: 13, color: Colors.redAccent),
-                      ),
-                    ],
                     const SizedBox(height: 20),
-                    SizedBox(
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: isSubmitting
-                            ? null
-                            : () async {
-                                setSheetState(() {
-                                  isSubmitting = true;
-                                  sheetError = null;
-                                });
-                                try {
-                                  final res = await _apiService.createShareLink(
-                                    _activeChild!.id,
-                                    days: selectedDays,
-                                    usePin: usePin,
-                                  );
-                                  if (res != null && res['token'] != null) {
-                                    final token = res['token'].toString();
-                                    final url = await shareUrl(token);
+
+                    if (createdUrl == null) ...[
+                      // Pilihan Masa Berlaku (1, 7, 14, 30 hari)
+                      Text(
+                        'Masa berlaku:',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF1E2A24),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 10,
+                        children: [1, 7, 14, 30].map((days) {
+                          final isSel = selectedDays == days;
+                          return ChoiceChip(
+                            label: Text('$days Hari'),
+                            selected: isSel,
+                            selectedColor: const Color(0xFFE3EEDF),
+                            backgroundColor: const Color(0xFFF6F4EF),
+                            labelStyle: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: isSel ? FontWeight.w600 : FontWeight.w500,
+                              color: isSel ? const Color(0xFF1F5C4A) : const Color(0xFF6F7B74),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(
+                                color: isSel ? const Color(0xFF1F5C4A) : const Color(0xFFD9DED6),
+                              ),
+                            ),
+                            onSelected: (val) {
+                              if (val) {
+                                setSheetState(() => selectedDays = days);
+                              }
+                            },
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Color.alphaBlend(
+                            const Color(0xFFD9DED6).withValues(alpha: 0.30),
+                            const Color(0xFFF6F4EF),
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Lindungi dengan PIN 6 digit',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF1E2A24),
+                                    ),
+                                  ),
+                                  Text(
+                                    'PIN akan ditampilkan terpisah agar lebih aman',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      color: const Color(0xFF6F7B74),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Switch(
+                              value: usePin,
+                              activeTrackColor: const Color(0xFF1F5C4A),
+                              onChanged: isSubmitting
+                                  ? null
+                                  : (val) => setSheetState(() => usePin = val),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (sheetError != null) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          sheetError!,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            color: const Color(0xFF1E2A24),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: isSubmitting
+                              ? null
+                              : () async {
+                                  setSheetState(() {
+                                    isSubmitting = true;
+                                    sheetError = null;
+                                  });
+                                  try {
+                                    final res = await _apiService.createShareLink(
+                                      _activeChild!.id,
+                                      days: selectedDays,
+                                      usePin: usePin,
+                                    );
+                                    if (res != null && res['token'] != null) {
+                                      final token = res['token'].toString();
+                                      final url = await shareUrl(token);
+                                      setSheetState(() {
+                                        createdToken = token;
+                                        createdUrl = url;
+                                        createdShortCode = res['short_code']?.toString();
+                                        createdPin = res['pin']?.toString();
+                                        isSubmitting = false;
+                                      });
+                                    } else {
+                                      setSheetState(() {
+                                        sheetError = 'Gagal membuat tautan';
+                                        isSubmitting = false;
+                                      });
+                                    }
+                                  } catch (e) {
                                     setSheetState(() {
-                                      createdToken = token;
-                                      createdUrl = url;
-                                      createdShortCode = res['short_code']?.toString();
-                                      createdPin = res['pin']?.toString();
-                                      isSubmitting = false;
-                                    });
-                                  } else {
-                                    setSheetState(() {
-                                      sheetError = 'Gagal membuat tautan';
+                                      sheetError = 'Terjadi kesalahan: $e';
                                       isSubmitting = false;
                                     });
                                   }
-                                } catch (e) {
-                                  setSheetState(() {
-                                    sheetError = 'Terjadi kesalahan: $e';
-                                    isSubmitting = false;
-                                  });
-                                }
-                              },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1F5C4A),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1F5C4A),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            elevation: 0,
                           ),
-                          elevation: 0,
-                        ),
-                        child: isSubmitting
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
+                          child: isSubmitting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Text(
+                                  'Buat Tautan Aman',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
                                 ),
-                              )
-                            : Text(
-                                'Buat Tautan Aman',
+                        ),
+                      ),
+                    ] else ...[
+                      // Tampilan respons Token Asli Hanya Sekali
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Color.alphaBlend(
+                            const Color(0xFFE8A24F).withValues(alpha: 0.14),
+                            const Color(0xFFF6F4EF),
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.info_outline_rounded,
+                              color: Color(0xFF1E2A24),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Tautan ini hanya ditampilkan sekali. Simpan sekarang. Tautan hanya bisa dibuka bila server dapat dijangkau penerima.',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: const Color(0xFF1E2A24),
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      // Kartu Tautan + Kode Akses (bagian utama untuk dibagikan)
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Color.alphaBlend(
+                            const Color(0xFFD9DED6).withValues(alpha: 0.30),
+                            const Color(0xFFF6F4EF),
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              childName.isNotEmpty
+                                  ? 'Berita informasi terakhir tentang $childName!'
+                                  : 'Berita informasi terakhir dari Siband!',
+                              style: GoogleFonts.inter(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF1F5C4A),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            SelectableText(
+                              createdUrl!,
+                              style: GoogleFonts.inter(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
+                                color: const Color(0xFF1E2A24),
+                              ),
+                            ),
+                            if (createdShortCode != null && createdShortCode!.isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE3EEDF),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  'Kode akses: $createdShortCode',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF1F5C4A),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final message = formatTherapistShareMessage(
+                              url: createdUrl!,
+                              childName: childName,
+                              shortCode: createdShortCode,
+                              hasPin: hasCreatedPin,
+                            );
+                            final subject = childName.isNotEmpty
+                                ? 'Berita informasi terakhir tentang $childName!'
+                                : 'Rekap Siband';
+                            final shared = await shareFn(message, subject: subject);
+                            if (!mounted) return;
+                            if (!shared) {
+                              ScaffoldMessenger.of(this.context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Pesan tautan & kode akses disalin ke clipboard'),
+                                  backgroundColor: Color(0xFF1F5C4A),
+                                ),
+                              );
+                            }
+                            if (!hasCreatedPin && sheetContext.mounted) {
+                              Navigator.pop(sheetContext);
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1F5C4A),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.share_rounded, color: Colors.white, size: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Bagikan Tautan',
                                 style: GoogleFonts.inter(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                   color: Colors.white,
                                 ),
                               ),
-                      ),
-                    ),
-                  ] else ...[
-                    // Tampilan respons Token Asli Hanya Sekali
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFFBEB),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFFDE68A)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.info_outline_rounded, color: Color(0xFFD97706), size: 20),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              'Tautan ini hanya ditampilkan sekali. Simpan sekarang. Tautan hanya bisa dibuka bila server dapat dijangkau penerima.',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: const Color(0xFF92400E),
-                              ),
-                            ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: SelectableText(
-                        createdUrl!,
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: const Color(0xFF1E2A24),
                         ),
                       ),
-                    ),
-                    if (createdShortCode != null || createdPin != null) ...[
+
+                      // Bagian PIN Terpisah (hanya muncul bila PIN aktif)
+                      if (hasCreatedPin) ...[
+                        const SizedBox(height: 14),
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE3EEDF),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.lock_outline_rounded,
+                                    size: 18,
+                                    color: Color(0xFF1F5C4A),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'PIN: $createdPin',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                        color: const Color(0xFF1E2A24),
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Salin PIN',
+                                    onPressed: () {
+                                      Clipboard.setData(ClipboardData(text: createdPin!));
+                                      ScaffoldMessenger.of(this.context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('PIN berhasil disalin'),
+                                          backgroundColor: Color(0xFF1F5C4A),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(
+                                      Icons.copy_rounded,
+                                      size: 18,
+                                      color: Color(0xFF1F5C4A),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                'Kirim PIN secara terpisah (misal lewat pesan berbeda) agar akses lebih aman.',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11.5,
+                                  color: const Color(0xFF6F7B74),
+                                  height: 1.35,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              SizedBox(
+                                height: 44,
+                                child: OutlinedButton(
+                                  onPressed: () async {
+                                    final pinMsg = formatTherapistPinMessage(
+                                      pin: createdPin!,
+                                      childName: childName,
+                                    );
+                                    final shared = await shareFn(
+                                      pinMsg,
+                                      subject: 'PIN Akses Rekap Siband',
+                                    );
+                                    if (!mounted) return;
+                                    if (!shared) {
+                                      ScaffoldMessenger.of(this.context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Pesan PIN disalin ke clipboard'),
+                                          backgroundColor: Color(0xFF1F5C4A),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFF1F5C4A),
+                                    side: const BorderSide(color: Color(0xFF1F5C4A)),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.share_rounded, size: 16),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Bagikan PIN Terpisah',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 10),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE3EEDF),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Wrap(
-                          spacing: 16,
-                          runSpacing: 6,
-                          children: [
-                            if (createdShortCode != null && createdShortCode!.isNotEmpty)
-                              Text(
-                                'Kode akses: $createdShortCode',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF1F5C4A),
-                                ),
-                              ),
-                            if (createdPin != null && createdPin!.isNotEmpty)
-                              Text(
-                                'PIN: $createdPin',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF1E2A24),
-                                ),
-                              ),
-                          ],
+                      TextButton(
+                        onPressed: () => Navigator.pop(sheetContext),
+                        child: Text(
+                          'Selesai',
+                          style: GoogleFonts.inter(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF6F7B74),
+                          ),
                         ),
                       ),
                     ],
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      height: 48,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          final textToCopy = (createdShortCode != null || createdPin != null)
-                              ? formatTherapistShareBundle(
-                                  url: createdUrl!,
-                                  shortCode: createdShortCode,
-                                  pin: createdPin,
-                                )
-                              : createdUrl!;
-                          Clipboard.setData(ClipboardData(text: textToCopy));
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Tautan berhasil disalin ke clipboard'),
-                              backgroundColor: Color(0xFF1F5C4A),
-                            ),
-                          );
-                          Navigator.pop(sheetContext);
-                        },
-                        icon: const Icon(Icons.copy_rounded, color: Colors.white, size: 18),
-                        label: Text(
-                          'Salin Tautan',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1F5C4A),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          elevation: 0,
-                        ),
-                      ),
-                    ),
                   ],
-                ],
+                ),
               ),
             );
           },
