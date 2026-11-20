@@ -29,17 +29,17 @@ void main() {
       expect(find.text('Kata sandi'), findsOneWidget);
       expect(find.text('nama@email.com'), findsOneWidget);
       expect(find.text('Masukkan kata sandi'), findsOneWidget);
-      expect(find.text('Lupa kata sandi?'), findsOneWidget);
+      expect(find.text('Lupa kata sandi?'), findsNothing);
       expect(find.widgetWithText(ElevatedButton, 'LOGIN'), findsOneWidget);
-      expect(find.text('Masuk dengan Google'), findsOneWidget);
+      expect(find.text('Masuk dengan Google'), findsNothing);
       expect(find.textContaining('Signup', findRichText: true), findsOneWidget);
 
       // Verify semantics labels on fields and buttons
       expect(find.byWidgetPredicate((w) => w is Semantics && w.properties.label == 'Email'), findsAtLeastNWidgets(1));
       expect(find.byWidgetPredicate((w) => w is Semantics && w.properties.label == 'Kata sandi'), findsAtLeastNWidgets(1));
       expect(find.byWidgetPredicate((w) => w is Semantics && w.properties.label == 'LOGIN'), findsOneWidget);
-      expect(find.byWidgetPredicate((w) => w is Semantics && w.properties.label == 'Masuk dengan Google'), findsOneWidget);
-      expect(find.byWidgetPredicate((w) => w is Semantics && w.properties.label == 'Lupa kata sandi?'), findsOneWidget);
+      expect(find.byWidgetPredicate((w) => w is Semantics && w.properties.label == 'Masuk dengan Google'), findsNothing);
+      expect(find.byWidgetPredicate((w) => w is Semantics && w.properties.label == 'Lupa kata sandi?'), findsNothing);
     });
 
     testWidgets('Renders LoginScreen and does not overflow on 412x915', (tester) async {
@@ -55,24 +55,13 @@ void main() {
       expect(find.widgetWithText(ElevatedButton, 'LOGIN'), findsOneWidget);
     });
 
-    testWidgets('Lupa kata sandi displays SnackBar', (tester) async {
+    testWidgets('LoginScreen tidak memuat Google maupun Lupa kata sandi', (tester) async {
       await tester.pumpWidget(buildTestable(const LoginScreen()));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Lupa kata sandi?'));
-      await tester.pump();
-
-      expect(find.text('Fitur ini belum tersedia'), findsOneWidget);
-    });
-
-    testWidgets('Google sign in displays SnackBar', (tester) async {
-      await tester.pumpWidget(buildTestable(const LoginScreen()));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Masuk dengan Google'));
-      await tester.pump();
-
-      expect(find.text('Masuk dengan Google belum tersedia'), findsOneWidget);
+      expect(find.textContaining('Google'), findsNothing);
+      expect(find.textContaining('Lupa kata sandi'), findsNothing);
+      expect(find.byType(SnackBar), findsNothing);
     });
 
     testWidgets('Tapping Signup navigates to RegisterScreen', (tester) async {
@@ -118,7 +107,7 @@ void main() {
       expect(find.text('Minimal 8 karakter'), findsOneWidget);
       expect(find.text('Ulangi kata sandi'), findsOneWidget);
       expect(find.widgetWithText(ElevatedButton, 'SIGN UP'), findsOneWidget);
-      expect(find.text('Masuk dengan Google'), findsOneWidget);
+      expect(find.text('Masuk dengan Google'), findsNothing);
       expect(find.textContaining('Login', findRichText: true), findsOneWidget);
 
       // Verify semantics labels on fields and buttons
@@ -127,7 +116,7 @@ void main() {
       expect(find.byWidgetPredicate((w) => w is Semantics && w.properties.label == 'Kata sandi'), findsAtLeastNWidgets(1));
       expect(find.byWidgetPredicate((w) => w is Semantics && w.properties.label == 'Konfirmasi kata sandi'), findsAtLeastNWidgets(1));
       expect(find.byWidgetPredicate((w) => w is Semantics && w.properties.label == 'SIGN UP'), findsOneWidget);
-      expect(find.byWidgetPredicate((w) => w is Semantics && w.properties.label == 'Masuk dengan Google'), findsOneWidget);
+      expect(find.byWidgetPredicate((w) => w is Semantics && w.properties.label == 'Masuk dengan Google'), findsNothing);
     });
 
     testWidgets('Renders RegisterScreen and does not overflow on 412x915', (tester) async {
@@ -143,14 +132,12 @@ void main() {
       expect(find.widgetWithText(ElevatedButton, 'SIGN UP'), findsOneWidget);
     });
 
-    testWidgets('Google sign in displays SnackBar on RegisterScreen', (tester) async {
+    testWidgets('RegisterScreen tidak memuat Google maupun Lupa kata sandi', (tester) async {
       await tester.pumpWidget(buildTestable(const RegisterScreen()));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Masuk dengan Google'));
-      await tester.pump();
-
-      expect(find.text('Masuk dengan Google belum tersedia'), findsOneWidget);
+      expect(find.textContaining('Google'), findsNothing);
+      expect(find.textContaining('Lupa kata sandi'), findsNothing);
     });
 
     testWidgets('Register validation displays required errors', (tester) async {

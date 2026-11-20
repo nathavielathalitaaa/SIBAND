@@ -75,30 +75,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _handleGoogleSignIn() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Masuk dengan Google belum tersedia'),
-      ),
-    );
-  }
-
-  void _handleForgotPassword() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Fitur ini belum tersedia'),
-      ),
-    );
-  }
-
-  Widget _buildGoogleIcon() {
-    return const Icon(
-      Icons.g_mobiledata_rounded,
-      size: 32,
-      color: Color(0xFF4285F4),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -318,25 +294,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 8),
 
-                          // Lupa kata sandi?
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: Semantics(
-                              label: 'Lupa kata sandi?',
-                              button: true,
-                              child: GestureDetector(
-                                onTap: _handleForgotPassword,
-                                child: Text(
-                                  'Lupa kata sandi?',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF1F5C4A),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
                           const SizedBox(height: 20),
 
                           // Tombol utama LOGIN
@@ -379,50 +336,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 12),
 
-                          // Tombol Google
-                          Semantics(
-                            label: 'Masuk dengan Google',
-                            button: true,
-                            child: Container(
-                              height: 46,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.06),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(12),
-                                  onTap: _handleGoogleSignIn,
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      _buildGoogleIcon(),
-                                      const SizedBox(width: 8),
-                                      Flexible(
-                                        child: Text(
-                                          'Masuk dengan Google',
-                                          overflow: TextOverflow.ellipsis,
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.w500,
-                                            color: const Color(0xFF111111),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
 
                           const Spacer(),
 

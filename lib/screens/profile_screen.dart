@@ -11,7 +11,6 @@ import 'journal_privacy_screen.dart';
 import 'manage_children_screen.dart';
 import 'onboarding_screen.dart';
 import 'pair_device_screen.dart';
-import 'placeholder_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback? onChildrenChanged;
@@ -560,12 +559,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildPreferenceCard({
     required String title,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
+    String? badge,
   }) {
+    final disabled = onTap == null;
     return Semantics(
-      label: title,
-      button: true,
-      child: Container(
+      label: disabled ? 'Segera hadir, belum aktif' : title,
+      button: !disabled,
+      enabled: !disabled,
+      excludeSemantics: disabled,
+      child: Opacity(
+        opacity: disabled ? 0.5 : 1.0,
+        child: Container(
         height: 56,
         decoration: BoxDecoration(
           color: Colors.white,
@@ -584,29 +589,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: onTap,
+            splashFactory: NoSplash.splashFactory,
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+            hoverColor: Colors.transparent,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      title,
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF1E2A24),
-                      ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF1E2A24),
+                          ),
+                        ),
+                        if (badge != null)
+                          Text(
+                            badge,
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFF6F7B74),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    size: 20,
-                    color: Color(0xFF6F7B74),
-                  ),
+                  if (!disabled)
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      size: 20,
+                      color: Color(0xFF6F7B74),
+                    ),
                 ],
               ),
             ),
           ),
+        ),
         ),
       ),
     );
@@ -886,18 +912,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 10),
             _buildPreferenceCard(
               title: 'Pengingat jurnal & zona aman',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const PlaceholderScreen(
-                      title: 'Segera hadir',
-                      message: 'Pengingat dan zona aman belum tersedia pada prototipe.',
-                      icon: Icons.notifications_active_outlined,
-                    ),
-                  ),
-                );
-              },
+              badge: 'Segera hadir',
             ),
             const SizedBox(height: 10),
             _buildPreferenceCard(

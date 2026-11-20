@@ -649,15 +649,25 @@ void main() {
         await tester.tap(find.byIcon(Icons.arrow_back_rounded));
         await tester.pumpAndSettle();
 
-        // 2. Pengingat jurnal & zona aman
+        // 2. Pengingat jurnal & zona aman: baris nonaktif, tanpa SnackBar
         await tester.ensureVisible(find.text('Pengingat jurnal & zona aman'));
         await tester.pumpAndSettle();
+        expect(find.text('Segera hadir'), findsOneWidget);
+        final semanticsHandle = tester.ensureSemantics();
+        expect(find.bySemanticsLabel('Segera hadir, belum aktif'), findsOneWidget);
+        semanticsHandle.dispose();
+        final disabledOpacity = tester.widget<Opacity>(
+          find.ancestor(
+            of: find.text('Pengingat jurnal & zona aman'),
+            matching: find.byType(Opacity),
+          ).first,
+        );
+        expect(disabledOpacity.opacity, 0.5);
         await tester.tap(find.text('Pengingat jurnal & zona aman'));
-        await tester.pumpAndSettle();
-        expect(find.text('Segera hadir'), findsAtLeastNWidgets(1));
-        expect(find.text('Pengingat dan zona aman belum tersedia pada prototipe.'), findsOneWidget);
-        await tester.pageBack();
-        await tester.pumpAndSettle();
+        await tester.pump();
+        expect(find.byType(SnackBar), findsNothing);
+        expect(find.text('Pengingat dan zona aman belum tersedia pada prototipe.'), findsNothing);
+        expect(find.byType(ProfileScreen), findsOneWidget);
 
         // 3. Bantuan dan dukungan
         await tester.ensureVisible(find.text('Bantuan dan dukungan'));
