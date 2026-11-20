@@ -71,4 +71,9 @@ if ($neonUrl !== '' && ! is_file($migratedMarker)) {
 /** @var \Illuminate\Foundation\Application $app */
 $app = require __DIR__.'/../bootstrap/app.php';
 
+// Cegah Symfony/Laravel memotong prefix '/api' karena entrypoint berada di /api/index.php
+$_SERVER['SCRIPT_NAME'] = '/index.php';
+$_SERVER['SCRIPT_FILENAME'] = __DIR__.'/../public/index.php';
+$_SERVER['PHP_SELF'] = '/index.php';
+
 $app->handleRequest(\Illuminate\Http\Request::capture());
