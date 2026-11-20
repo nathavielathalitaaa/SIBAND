@@ -594,7 +594,12 @@ class ApiService {
   }
 
   /// Buat tautan berbagi baru (POST /api/children/{child}/share-links).
-  Future<Map<String, dynamic>?> createShareLink(int childId, {int days = 7}) async {
+  Future<Map<String, dynamic>?> createShareLink(
+    int childId, {
+    int days = 7,
+    bool usePin = false,
+    String? pin,
+  }) async {
     try {
       final token = await _authService.getToken();
       if (token == null || token.isEmpty) {
@@ -603,6 +608,13 @@ class ApiService {
 
       final baseUrl = await _configService.getBaseUrl();
       final url = Uri.parse('$baseUrl/children/$childId/share-links');
+      final payload = <String, dynamic>{'days': days};
+      if (usePin) {
+        payload['use_pin'] = true;
+      }
+      if (pin != null && pin.trim().isNotEmpty) {
+        payload['pin'] = pin.trim();
+      }
 
       final response = await _client.post(
         url,
@@ -611,7 +623,7 @@ class ApiService {
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: jsonEncode({'days': days}),
+        body: jsonEncode(payload),
       ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200 || response.statusCode == 201) {

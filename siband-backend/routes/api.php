@@ -15,7 +15,8 @@ use Illuminate\Support\Facades\Route;
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
-// Public share link endpoint (throttled, no auth)
+// Public share link endpoints (throttled, no auth)
+Route::post('/share/access', [ShareLinkController::class, 'accessPublic'])->middleware('throttle:20,1');
 Route::get('/share/{token}', [ShareLinkController::class, 'showPublic'])->middleware('throttle:20,1');
 
 Route::middleware('auth:sanctum')->group(function () {

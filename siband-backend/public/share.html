@@ -327,6 +327,86 @@
       color: #1E2A24;
       line-height: 1.4;
     }
+    .state-sub {
+      font-size: 14px;
+      color: rgba(30, 42, 36, 0.78);
+      line-height: 1.45;
+    }
+    .access-fields {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      text-align: left;
+      margin-top: 6px;
+    }
+    .field-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #1E2A24;
+      margin-bottom: 4px;
+    }
+    .field-input {
+      width: 100%;
+      min-height: 46px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid #D9DED6;
+      background-color: #F6F4EF;
+      color: #1E2A24;
+      font-family: inherit;
+      font-size: 16px;
+    }
+    .field-input:focus-visible {
+      outline: 3px solid #1F5C4A;
+      outline-offset: 1px;
+    }
+    .field-error {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1E2A24;
+      background-color: rgba(232, 162, 79, 0.22);
+      border-radius: 10px;
+      padding: 8px 12px;
+      width: 100%;
+    }
+    .primary-btn {
+      width: 100%;
+      min-height: 46px;
+      padding: 10px 16px;
+      border: 0;
+      border-radius: 12px;
+      background-color: #1F5C4A;
+      color: #F6F4EF;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .primary-btn:hover {
+      background-color: rgba(31, 92, 74, 0.9);
+    }
+    .primary-btn:focus-visible {
+      outline: 3px solid #1E2A24;
+      outline-offset: 2px;
+    }
+    .secondary-btn {
+      min-height: 44px;
+      padding: 8px 16px;
+      border: 1px solid #1F5C4A;
+      border-radius: 12px;
+      background-color: transparent;
+      color: #1F5C4A;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .secondary-btn:focus-visible {
+      outline: 3px solid #1E2A24;
+      outline-offset: 2px;
+    }
     .spin-svg {
       animation: spin 1.2s linear infinite;
     }
@@ -578,10 +658,55 @@
         return svg;
       }
 
-      function showErrorState() {
+      function clearApp() {
         while (app.firstChild) {
           app.removeChild(app.firstChild);
         }
+      }
+
+      function showLoadingState() {
+        clearApp();
+        var wrapper = document.createElement('div');
+        wrapper.className = 'state-wrapper';
+
+        var card = document.createElement('div');
+        card.className = 'card state-message';
+        card.setAttribute('role', 'status');
+
+        var iconBox = document.createElement('div');
+        iconBox.className = 'state-icon-box';
+        iconBox.setAttribute('aria-hidden', 'true');
+
+        var spinSvg = createSvgEl('svg', {
+          'class': 'spin-svg',
+          'width': '28',
+          'height': '28',
+          'viewBox': '0 0 28 28',
+          'aria-hidden': 'true'
+        });
+        spinSvg.appendChild(createSvgEl('circle', {
+          'cx': '14', 'cy': '14', 'r': '10',
+          'fill': 'none', 'stroke': '#D9DED6', 'stroke-width': '3'
+        }));
+        spinSvg.appendChild(createSvgEl('path', {
+          'd': 'M14 4 A10 10 0 0 1 24 14',
+          'fill': 'none', 'stroke': '#1F5C4A', 'stroke-width': '3',
+          'stroke-linecap': 'round'
+        }));
+        iconBox.appendChild(spinSvg);
+        card.appendChild(iconBox);
+
+        var title = document.createElement('h1');
+        title.className = 'state-title';
+        title.textContent = 'Memuat data rekap...';
+        card.appendChild(title);
+
+        wrapper.appendChild(card);
+        app.appendChild(wrapper);
+      }
+
+      function showErrorState() {
+        clearApp();
         var wrapper = document.createElement('div');
         wrapper.className = 'state-wrapper';
 
@@ -600,35 +725,190 @@
         title.textContent = 'Tautan tidak ditemukan atau sudah tidak berlaku.';
         errorCard.appendChild(title);
 
+        var retryBtn = document.createElement('button');
+        retryBtn.type = 'button';
+        retryBtn.className = 'secondary-btn';
+        retryBtn.textContent = 'Masukkan kode akses';
+        retryBtn.addEventListener('click', function() {
+          showAccessForm('', false, '');
+        });
+        errorCard.appendChild(retryBtn);
+
         wrapper.appendChild(errorCard);
         app.appendChild(wrapper);
       }
 
-      // Validasi token ada dan tidak kosong
-      if (!token || token.trim().length === 0) {
-        showErrorState();
-        return;
+      function showAccessForm(prefilledCode, pinOnlyMode, errorMsg) {
+        clearApp();
+        var wrapper = document.createElement('div');
+        wrapper.className = 'state-wrapper';
+
+        var card = document.createElement('div');
+        card.className = 'card state-message';
+
+        card.appendChild(createBrandLogoSvg());
+
+        var title = document.createElement('h1');
+        title.className = 'state-title';
+        title.textContent = pinOnlyMode ? 'Masukkan kode PIN' : 'Buka rekap terapis';
+        card.appendChild(title);
+
+        var sub = document.createElement('p');
+        sub.className = 'state-sub';
+        sub.textContent = pinOnlyMode
+          ? 'Tautan ini dilindungi PIN 6 digit dari orang tua.'
+          : 'Masukkan kode akses dari orang tua beserta PIN bila ada.';
+        card.appendChild(sub);
+
+        var fields = document.createElement('div');
+        fields.className = 'access-fields';
+
+        var codeInput = null;
+        if (!pinOnlyMode) {
+          var codeWrap = document.createElement('div');
+          var codeLabel = document.createElement('label');
+          codeLabel.className = 'field-label';
+          codeLabel.setAttribute('for', 'share-code-input');
+          codeLabel.textContent = 'Kode akses atau token';
+          codeWrap.appendChild(codeLabel);
+
+          codeInput = document.createElement('input');
+          codeInput.id = 'share-code-input';
+          codeInput.type = 'text';
+          codeInput.className = 'field-input';
+          codeInput.placeholder = 'Contoh: SB7K4M';
+          codeInput.autocomplete = 'off';
+          codeInput.value = prefilledCode || '';
+          codeWrap.appendChild(codeInput);
+          fields.appendChild(codeWrap);
+        }
+
+        var pinWrap = document.createElement('div');
+        var pinLabel = document.createElement('label');
+        pinLabel.className = 'field-label';
+        pinLabel.setAttribute('for', 'share-pin-input');
+        pinLabel.textContent = pinOnlyMode ? 'Kode PIN' : 'Kode PIN (opsional)';
+        pinWrap.appendChild(pinLabel);
+
+        var pinInput = document.createElement('input');
+        pinInput.id = 'share-pin-input';
+        pinInput.type = 'password';
+        pinInput.inputMode = 'numeric';
+        pinInput.className = 'field-input';
+        pinInput.placeholder = '6 digit angka';
+        pinInput.autocomplete = 'one-time-code';
+        pinWrap.appendChild(pinInput);
+        fields.appendChild(pinWrap);
+
+        if (errorMsg) {
+          var errBox = document.createElement('div');
+          errBox.className = 'field-error';
+          errBox.setAttribute('role', 'alert');
+          errBox.textContent = errorMsg;
+          fields.appendChild(errBox);
+        }
+
+        var submitBtn = document.createElement('button');
+        submitBtn.type = 'button';
+        submitBtn.className = 'primary-btn';
+        submitBtn.textContent = 'Buka rekap';
+
+        function handleSubmit() {
+          var enteredCode = pinOnlyMode ? prefilledCode : (codeInput ? codeInput.value.trim() : '');
+          var enteredPin = pinInput.value.trim();
+          if (!enteredCode) {
+            showAccessForm('', false, 'Masukkan kode akses terlebih dahulu.');
+            return;
+          }
+          if (pinOnlyMode && !enteredPin) {
+            showAccessForm(prefilledCode, true, 'Masukkan kode PIN terlebih dahulu.');
+            return;
+          }
+          requestRecap(enteredCode, enteredPin, pinOnlyMode);
+        }
+
+        submitBtn.addEventListener('click', handleSubmit);
+        pinInput.addEventListener('keydown', function(ev) {
+          if (ev.key === 'Enter') handleSubmit();
+        });
+        if (codeInput) {
+          codeInput.addEventListener('keydown', function(ev) {
+            if (ev.key === 'Enter') handleSubmit();
+          });
+        }
+
+        fields.appendChild(submitBtn);
+        card.appendChild(fields);
+        wrapper.appendChild(card);
+        app.appendChild(wrapper);
       }
 
-      // 3. Fetch GET ke "/api/share/" + token
-      fetch('/api/share/' + encodeURIComponent(token.trim()), {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
+      function requestRecap(codeValue, pinValue, fromLink) {
+        showLoadingState();
+        var trimmedCode = codeValue.trim();
+        var trimmedPin = (pinValue || '').trim();
+
+        var fetchPromise;
+        if (trimmedPin.length > 0 || !fromLink) {
+          fetchPromise = fetch('/api/share/access', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+              code: trimmedCode,
+              pin: trimmedPin.length > 0 ? trimmedPin : null
+            })
+          });
+        } else {
+          fetchPromise = fetch('/api/share/' + encodeURIComponent(trimmedCode), {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json'
+            }
+          });
         }
-      })
-      .then(function(res) {
-        if (!res.ok) {
-          throw new Error('HTTP ' + res.status);
-        }
-        return res.json();
-      })
-      .then(function(data) {
-        renderPage(data);
-      })
-      .catch(function() {
-        showErrorState();
-      });
+
+        fetchPromise
+          .then(function(res) {
+            return res.json().catch(function() { return {}; }).then(function(body) {
+              return { status: res.status, ok: res.ok, body: body };
+            });
+          })
+          .then(function(result) {
+            if (result.ok) {
+              renderPage(result.body);
+              return;
+            }
+            if (result.status === 403 && result.body && result.body.requires_pin) {
+              var msg = result.body.invalid_pin
+                ? 'Kode PIN tidak sesuai. Coba lagi.'
+                : '';
+              showAccessForm(trimmedCode, fromLink, msg);
+              return;
+            }
+            if (!fromLink) {
+              showAccessForm(
+                trimmedCode,
+                false,
+                'Tautan tidak ditemukan atau sudah tidak berlaku.'
+              );
+              return;
+            }
+            showErrorState();
+          })
+          .catch(function() {
+            showErrorState();
+          });
+      }
+
+      // Jika dibuka dengan #<token>, langsung muat; jika tanpa hash (/share), tampilkan form kode akses.
+      if (!token || token.trim().length === 0) {
+        showAccessForm('', false, '');
+      } else {
+        requestRecap(token.trim(), '', true);
+      }
 
       var typeNameMap = {
         'suara_keras': 'Suara keras',

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Hash;
 
 class ShareLink extends Model
 {
@@ -12,6 +13,8 @@ class ShareLink extends Model
     protected $fillable = [
         'child_id',
         'token_hash',
+        'short_code',
+        'pin_hash',
         'expires_at',
         'revoked_at',
         'last_accessed_at',
@@ -22,6 +25,23 @@ class ShareLink extends Model
         'revoked_at' => 'datetime',
         'last_accessed_at' => 'datetime',
     ];
+
+    public function requiresPin(): bool
+    {
+        return $this->pin_hash !== null && $this->pin_hash !== '';
+    }
+
+    public function verifyPin(?string $pin): bool
+    {
+        if (! $this->requiresPin()) {
+            return true;
+        }
+        if ($pin === null || trim($pin) === '') {
+            return false;
+        }
+
+        return Hash::check(trim($pin), $this->pin_hash);
+    }
 
     public function child()
     {

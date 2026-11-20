@@ -15,11 +15,27 @@ String extractOrigin(String baseUrl) {
   return trimmed;
 }
 
-/// Membentuk tautan berbagi rekap terapis dari token: `<origin>/share.html#<token>`
+/// Membentuk tautan berbagi rekap terapis dari token: `<origin>/share#<token>`
 /// dengan origin diambil dari baseUrl config_service tanpa akhiran "/api".
 Future<String> shareUrl(String token, {ConfigService? configService}) async {
   final cs = configService ?? ConfigService();
   final baseUrl = await cs.getBaseUrl();
   final origin = extractOrigin(baseUrl);
-  return '$origin/share.html#$token';
+  return '$origin/share#$token';
+}
+
+/// Format teks ringkas berisi tautan, kode akses, dan PIN (bila ada) untuk dikirim ke terapis.
+String formatTherapistShareBundle({
+  required String url,
+  String? shortCode,
+  String? pin,
+}) {
+  final lines = <String>['Rekap Siband untuk terapis:', url];
+  if (shortCode != null && shortCode.trim().isNotEmpty) {
+    lines.add('Kode akses: ${shortCode.trim()}');
+  }
+  if (pin != null && pin.trim().isNotEmpty) {
+    lines.add('PIN: ${pin.trim()}');
+  }
+  return lines.join('\n');
 }

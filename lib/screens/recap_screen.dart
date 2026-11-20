@@ -344,8 +344,11 @@ class _RecapScreenState extends State<RecapScreen> {
   Future<void> _openCreateShareSheet() async {
     if (_activeChild == null) return;
     int selectedDays = 7;
+    bool usePin = true;
     String? createdToken;
     String? createdUrl;
+    String? createdShortCode;
+    String? createdPin;
     bool isSubmitting = false;
     String? sheetError;
 
@@ -438,6 +441,47 @@ class _RecapScreenState extends State<RecapScreen> {
                         );
                       }).toList(),
                     ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF6F4EF),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Lindungi dengan PIN 6 digit',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF1E2A24),
+                                  ),
+                                ),
+                                Text(
+                                  'Terapis memasukkan PIN untuk membuka rekap',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    color: const Color(0xFF6F7B74),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch(
+                            value: usePin,
+                            activeTrackColor: const Color(0xFF1F5C4A),
+                            onChanged: isSubmitting
+                                ? null
+                                : (val) => setSheetState(() => usePin = val),
+                          ),
+                        ],
+                      ),
+                    ),
                     if (sheetError != null) ...[
                       const SizedBox(height: 12),
                       Text(
@@ -445,7 +489,7 @@ class _RecapScreenState extends State<RecapScreen> {
                         style: GoogleFonts.inter(fontSize: 13, color: Colors.redAccent),
                       ),
                     ],
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
                     SizedBox(
                       height: 48,
                       child: ElevatedButton(
@@ -460,6 +504,7 @@ class _RecapScreenState extends State<RecapScreen> {
                                   final res = await _apiService.createShareLink(
                                     _activeChild!.id,
                                     days: selectedDays,
+                                    usePin: usePin,
                                   );
                                   if (res != null && res['token'] != null) {
                                     final token = res['token'].toString();
@@ -467,6 +512,8 @@ class _RecapScreenState extends State<RecapScreen> {
                                     setSheetState(() {
                                       createdToken = token;
                                       createdUrl = url;
+                                      createdShortCode = res['short_code']?.toString();
+                                      createdPin = res['pin']?.toString();
                                       isSubmitting = false;
                                     });
                                   } else {
@@ -551,12 +598,53 @@ class _RecapScreenState extends State<RecapScreen> {
                         ),
                       ),
                     ),
+                    if (createdShortCode != null || createdPin != null) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE3EEDF),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Wrap(
+                          spacing: 16,
+                          runSpacing: 6,
+                          children: [
+                            if (createdShortCode != null && createdShortCode!.isNotEmpty)
+                              Text(
+                                'Kode akses: $createdShortCode',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF1F5C4A),
+                                ),
+                              ),
+                            if (createdPin != null && createdPin!.isNotEmpty)
+                              Text(
+                                'PIN: $createdPin',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF1E2A24),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     SizedBox(
                       height: 48,
                       child: ElevatedButton.icon(
                         onPressed: () {
-                          Clipboard.setData(ClipboardData(text: createdUrl!));
+                          final textToCopy = (createdShortCode != null || createdPin != null)
+                              ? formatTherapistShareBundle(
+                                  url: createdUrl!,
+                                  shortCode: createdShortCode,
+                                  pin: createdPin,
+                                )
+                              : createdUrl!;
+                          Clipboard.setData(ClipboardData(text: textToCopy));
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Tautan berhasil disalin ke clipboard'),
@@ -1397,6 +1485,8 @@ class _RecapScreenState extends State<RecapScreen> {
           const SizedBox(height: 12),
           ..._shareLinks.map((link) {
             final status = link['status']?.toString() ?? 'active';
+            final shortCode = link['short_code']?.toString();
+            final hasPin = link['has_pin'] == true;
             final expiresAt = link['expires_at']?.toString();
             final lastAccessedAt = link['last_accessed_at']?.toString();
             final isRevoked = link['revoked_at'] != null || status == 'revoked';
@@ -1446,6 +1536,22 @@ class _RecapScreenState extends State<RecapScreen> {
                                 ),
                               ),
                             ),
+                            if (shortCode != null && shortCode.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE3EEDF),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'Kode: $shortCode${hasPin ? ' · PIN' : ''}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF1F5C4A),
+                                  ),
+                                ),
+                              ),
                             Text(
                               'Kedaluwarsa: ${_formatDateTimeString(expiresAt)}',
                               style: GoogleFonts.inter(

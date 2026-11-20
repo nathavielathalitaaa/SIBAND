@@ -47,10 +47,10 @@ void main() {
       expect(extractOrigin('https://example.com/v1/api/'), 'https://example.com/v1');
     });
 
-    test('shareUrl generates <origin>/share.html#<token> with default baseUrl', () async {
+    test('shareUrl generates <origin>/share#<token> with default baseUrl', () async {
       SharedPreferences.setMockInitialValues({});
       final url = await shareUrl('tok12345');
-      expect(url, 'http://127.0.0.1:8000/share.html#tok12345');
+      expect(url, 'http://127.0.0.1:8000/share#tok12345');
     });
 
     test('shareUrl generates correctly with custom baseUrl in SharedPreferences', () async {
@@ -58,7 +58,7 @@ void main() {
         ConfigService.apiBaseUrlKey: 'https://production-server.com/api',
       });
       final url = await shareUrl('secret-token-abc');
-      expect(url, 'https://production-server.com/share.html#secret-token-abc');
+      expect(url, 'https://production-server.com/share#secret-token-abc');
     });
 
     test('shareUrl generates correctly with custom baseUrl ending with slash', () async {
@@ -66,7 +66,7 @@ void main() {
         ConfigService.apiBaseUrlKey: 'https://production-server.com/api/',
       });
       final url = await shareUrl('tok999');
-      expect(url, 'https://production-server.com/share.html#tok999');
+      expect(url, 'https://production-server.com/share#tok999');
     });
 
     test('shareUrl generates correctly with baseUrl without /api suffix', () async {
@@ -74,7 +74,18 @@ void main() {
         ConfigService.apiBaseUrlKey: 'https://my-domain.org/',
       });
       final url = await shareUrl('xyz789');
-      expect(url, 'https://my-domain.org/share.html#xyz789');
+      expect(url, 'https://my-domain.org/share#xyz789');
+    });
+
+    test('formatTherapistShareBundle formats link, short code, and PIN', () {
+      final text = formatTherapistShareBundle(
+        url: 'https://demo.trycloudflare.com/share#abc',
+        shortCode: 'SB7K4M',
+        pin: '482910',
+      );
+      expect(text, contains('https://demo.trycloudflare.com/share#abc'));
+      expect(text, contains('Kode akses: SB7K4M'));
+      expect(text, contains('PIN: 482910'));
     });
   });
 
@@ -99,6 +110,9 @@ void main() {
             jsonEncode({
               'id': 1,
               'token': 'mocked_share_token_abcdef',
+              'short_code': 'SB7K4M',
+              'has_pin': true,
+              'pin': '482910',
               'expires_at': DateTime.now().add(const Duration(days: 7)).toIso8601String(),
             }),
             201,
@@ -147,11 +161,13 @@ void main() {
         findsOneWidget,
       );
 
-      // Verify the generated URL format matches <origin>/share.html#<token>
+      // Verify the generated URL format matches <origin>/share#<token> + short code & PIN
       expect(
-        find.text('http://127.0.0.1:8000/share.html#mocked_share_token_abcdef'),
+        find.text('http://127.0.0.1:8000/share#mocked_share_token_abcdef'),
         findsOneWidget,
       );
+      expect(find.text('Kode akses: SB7K4M'), findsOneWidget);
+      expect(find.text('PIN: 482910'), findsOneWidget);
 
       // Verify copy button
       expect(find.widgetWithText(ElevatedButton, 'Salin Tautan'), findsOneWidget);

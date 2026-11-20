@@ -258,4 +258,69 @@ class ShareLinkTest extends TestCase
         $this->assertSame($responseBogus->json(), $responseRevoked->json());
         $this->assertSame('Tautan berbagi tidak ditemukan atau sudah tidak berlaku.', $responseBogus->json('message'));
     }
+
+    public function test_share_link_with_pin_and_short_code_requires_valid_pin_and_works_via_post_access(): void
+    {
+        $user = User::factory()->create();
+        $child = Child::factory()->create([
+            'user_id' => $user->id,
+            'nickname' => 'Razzab',
+            'birth_year' => 2012,
+        ]);
+
+        $createRes = $this->actingAs($user, 'sanctum')
+            ->postJson("/api/children/{$child->id}/share-links", [
+                'days' => 7,
+                'use_pin' => true,
+            ]);
+
+        $createRes->assertStatus(201)
+            ->assertJson(['has_pin' => true, 'status' => 'active'])
+            ->assertJsonStructure(['id', 'token', 'short_code', 'has_pin', 'pin', 'expires_at', 'status']);
+
+        $token = $createRes->json('token');
+        $shortCode = $createRes->json('short_code');
+        $pin = $createRes->json('pin');
+
+        $this->assertMatchesRegularExpression('/^\d{6}$/', $pin);
+        $this->assertNotEmpty($shortCode);
+
+        // Index never leaks pin or pin_hash
+        $indexRes = $this->actingAs($user, 'sanctum')
+            ->getJson("/api/children/{$child->id}/share-links");
+        $indexRes->assertOk();
+        $this->assertStringNotContainsString($pin, $indexRes->getContent());
+        $this->assertStringNotContainsString('pin_hash', $indexRes->getContent());
+
+        // Access without PIN -> 403 requires_pin without leaking nickname
+        $noPinRes = $this->getJson("/api/share/{$token}");
+        $noPinRes->assertStatus(403)
+            ->assertJson(['requires_pin' => true]);
+        $this->assertStringNotContainsString('Razzab', $noPinRes->getContent());
+
+        // Access with wrong PIN -> 403 invalid_pin
+        $wrongPinRes = $this->postJson('/api/share/access', [
+            'code' => $shortCode,
+            'pin' => '000000' === $pin ? '111111' : '000000',
+        ]);
+        $wrongPinRes->assertStatus(403)
+            ->assertJson(['requires_pin' => true, 'invalid_pin' => true]);
+
+        // Access with short code + correct PIN -> 200
+        $okShortRes = $this->postJson('/api/share/access', [
+            'code' => $shortCode,
+            'pin' => $pin,
+        ]);
+        $okShortRes->assertOk()
+            ->assertJson(['nickname' => 'Razzab']);
+
+        // Access with token + X-Share-Pin header -> 200
+        $okHeaderRes = $this->withHeader('X-Share-Pin', $pin)
+            ->getJson("/api/share/{$token}");
+        $okHeaderRes->assertOk()
+            ->assertJson(['nickname' => 'Razzab']);
+
+        // Clean web route /share serves share.html
+        $this->get('/share')->assertOk();
+    }
 }
