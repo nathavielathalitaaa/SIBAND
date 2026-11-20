@@ -8,28 +8,39 @@ import '../models/child_model.dart';
 import '../services/api_service.dart';
 import '../services/heart_rate_service.dart';
 import '../utils/event_type_helper.dart';
+import '../widgets/heartbeat_pulse.dart';
 import '../widgets/home_monitoring_chart_card.dart';
+import '../widgets/siband_logo.dart';
+import '../widgets/watch_status_chip.dart';
 import 'event_note_screen.dart';
+import 'guide_calming_screen.dart';
 import 'pair_device_screen.dart';
+import 'pattern_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onNavigateToPanduan;
+  final VoidCallback? onNavigateToRekap;
   final List<ChildModel>? initialChildren;
   final String? initialUserName;
   final String? initialErrorMessage;
   final Future<List<ChildModel>> Function()? onFetchChildren;
   final AnalysisModel? initialAnalysisData;
   final ApiService? apiService;
+  final HeartRateService? heartRateService;
+  final bool isActiveTab;
 
   const HomeScreen({
     super.key,
     this.onNavigateToPanduan,
+    this.onNavigateToRekap,
     this.initialChildren,
     this.initialUserName,
     this.initialErrorMessage,
     this.onFetchChildren,
     this.initialAnalysisData,
     this.apiService,
+    this.heartRateService,
+    this.isActiveTab = true,
   });
 
   @override
@@ -38,7 +49,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late final ApiService _apiService;
-  final HeartRateService _hrService = HeartRateService.instance;
+  late final HeartRateService _hrService;
 
   static const String activeChildIdKey = 'active_child_id';
 
@@ -50,10 +61,10 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _analysisLoadFailed = false;
   String? _errorMessage;
 
-  String _userName = 'Orang Tua';
   AnalysisModel? _analysisData;
   Map<String, dynamic>? _baselineData;
   List<Map<String, dynamic>> _hourlyAverages = [];
+  final Set<String> _animatedEpisodeKeys = <String>{};
 
   Timer? _refreshTimer;
 
@@ -61,6 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _apiService = widget.apiService ?? ApiService();
+    _hrService = widget.heartRateService ?? HeartRateService.instance;
     _analysisData = widget.initialAnalysisData;
 
     _hrService.start();
@@ -79,9 +91,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _hrService.setActiveChild(_activeChild!.id);
       }
     }
-    if (widget.initialUserName != null) {
-      _userName = widget.initialUserName!;
-    }
 
     if (widget.initialErrorMessage == null) {
       _initData();
@@ -98,6 +107,13 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void didUpdateWidget(covariant HomeScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.initialChildren != oldWidget.initialChildren &&
+        widget.initialChildren != null) {
+      setState(() {
+        _children = widget.initialChildren!;
+        _activeChild = _children.isNotEmpty ? _children.first : null;
+      });
+    }
     if (widget.initialAnalysisData != oldWidget.initialAnalysisData &&
         widget.initialAnalysisData != null) {
       setState(() {
@@ -122,9 +138,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _initData() async {
     final futures = <Future<void>>[];
-    if (widget.initialUserName == null) {
-      futures.add(_fetchUserProfile());
-    }
     if (widget.initialChildren == null) {
       futures.add(_fetchChildren());
     } else {
@@ -165,18 +178,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _isLoadingChildren = true;
     });
     await _initData();
-  }
-
-  Future<void> _fetchUserProfile() async {
-    try {
-      final user = await _apiService.getUserProfile();
-      if (!mounted) return;
-      if (user != null && user['name'] != null) {
-        setState(() {
-          _userName = user['name'].toString();
-        });
-      }
-    } catch (_) {}
   }
 
   Future<void> _fetchChildren() async {
@@ -238,9 +239,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       _activeChild = child;
+      _animatedEpisodeKeys.clear();
     });
 
     await _fetchStatsForChild(child.id);
+  }
+
+  Future<void> _handlePullToRefresh() async {
+    if (widget.initialChildren == null) {
+      await _fetchChildren();
+    } else if (_activeChild != null) {
+      await _fetchStatsForChild(_activeChild!.id);
+    }
   }
 
   bool _isUnauthenticatedError(Object error) {
@@ -366,19 +376,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return result;
   }
 
-  String _getGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour >= 4 && hour < 11) {
-      return 'Selamat Pagi';
-    } else if (hour >= 11 && hour < 15) {
-      return 'Selamat Siang';
-    } else if (hour >= 15 && hour < 18) {
-      return 'Selamat Sore';
-    } else {
-      return 'Selamat Malam';
-    }
-  }
-
   /// Format HH:mm dari ISO 8601 string (mempertahankan jam lokal pada offset string seperti +07:00).
   String _formatTimeWib(String? iso) {
     if (iso == null || iso.isEmpty) return '--:--';
@@ -462,9 +459,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }) {
     final bool isBleMode = _hrService.currentMode == Mode.ble;
     final HrSensorStatus bleStatus = _hrService.sensorStatus;
-    final bool hasFreshLocalBleReading = _hrService.lastBpmReceivedAt != null &&
-        _hrService.currentBpm > 0 &&
-        _hrService.secondsSinceLastBpm <= staleAfterSeconds;
+    final bool hasFreshLocalBleReading = hasFreshLocalBleReadingForWatch(
+      _hrService,
+      staleAfterSeconds: staleAfterSeconds,
+    );
 
     final bool hasBackendBpm = analysisCurrent?.bpm != null;
     final bool isBackendStale = analysisCurrent != null &&
@@ -509,7 +507,7 @@ class _HomeScreenState extends State<HomeScreen> {
             episodeMargin: episodeMargin,
             preferDynamicBpmCalculation: true,
           ),
-          measurementStateLabel: 'Bacaan terakhir · jeda istirahat',
+          measurementStateLabel: 'Jam sedang beristirahat sebentar',
         );
       }
       if (hasBackendBpm && !isBackendStale) {
@@ -532,7 +530,7 @@ class _HomeScreenState extends State<HomeScreen> {
         effectiveBpm: null,
         bpmDisplay: '--',
         statusLabel: 'Data tidak terbaru',
-        measurementStateLabel: 'Data terakhir kedaluwarsa',
+        measurementStateLabel: 'Belum ada data baru',
       );
     }
 
@@ -551,7 +549,7 @@ class _HomeScreenState extends State<HomeScreen> {
             p75: p75,
             episodeMargin: episodeMargin,
           ),
-          measurementStateLabel: 'Sensor terputus · bacaan terakhir',
+          measurementStateLabel: 'Jam tidak terhubung · bacaan terakhir',
         );
       }
       if (hasBackendBpm && isBackendStale) {
@@ -559,14 +557,14 @@ class _HomeScreenState extends State<HomeScreen> {
           effectiveBpm: null,
           bpmDisplay: '--',
           statusLabel: 'Data tidak terbaru',
-          measurementStateLabel: 'Sensor terputus · data kedaluwarsa',
+          measurementStateLabel: 'Jam tidak terhubung',
         );
       }
       return (
         effectiveBpm: null,
         bpmDisplay: '--',
-        statusLabel: 'Sensor terputus',
-        measurementStateLabel: 'Belum ada pembacaan sensor',
+        statusLabel: 'Jam tidak terhubung',
+        measurementStateLabel: 'Menunggu bacaan pertama dari jam',
       );
     }
 
@@ -578,7 +576,7 @@ class _HomeScreenState extends State<HomeScreen> {
             effectiveBpm: null,
             bpmDisplay: '--',
             statusLabel: 'Data tidak terbaru',
-            measurementStateLabel: 'Data terakhir kedaluwarsa',
+            measurementStateLabel: 'Belum ada data baru',
           );
         }
         final backendBpm = analysisCurrent.bpm!;
@@ -601,7 +599,7 @@ class _HomeScreenState extends State<HomeScreen> {
         effectiveBpm: null,
         bpmDisplay: '--',
         statusLabel: 'Belum ada pembacaan',
-        measurementStateLabel: 'Belum ada data terbaru',
+        measurementStateLabel: 'Belum ada data baru',
       );
     }
 
@@ -612,6 +610,21 @@ class _HomeScreenState extends State<HomeScreen> {
       statusLabel: 'Mode simulasi contoh',
       measurementStateLabel: 'Simulasi (bukan sensor aktual)',
     );
+  }
+
+  HeartbeatState _resolveHeartbeatState(String measurementStateLabel) {
+    if (measurementStateLabel == 'Simulasi (bukan sensor aktual)') {
+      return HeartbeatState.simulated;
+    }
+    if (measurementStateLabel == 'Pembacaan langsung BLE' ||
+        measurementStateLabel == 'Jam sedang mengukur') {
+      return HeartbeatState.measuring;
+    }
+    if (measurementStateLabel == 'Jam sedang beristirahat sebentar' ||
+        measurementStateLabel.startsWith('Jeda istirahat sensor')) {
+      return HeartbeatState.resting;
+    }
+    return HeartbeatState.stale;
   }
 
   Color _resolveStatusBadgeColor(String statusLabel) {
@@ -631,12 +644,12 @@ class _HomeScreenState extends State<HomeScreen> {
     if (current == null) return '';
     switch (current.measurementState) {
       case 'mengukur':
-        return 'Sensor aktif mengukur';
+        return 'Jam sedang mengukur';
       case 'istirahat_jam':
         final restMin = (current.expectedRestSeconds / 60).round();
         return 'Jeda istirahat sensor (~$restMin mnt)';
       case 'tidak_ada_data':
-        return 'Belum ada data terbaru';
+        return 'Belum ada data baru';
       default:
         return '';
     }
@@ -919,181 +932,134 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildLogo() {
-    return Image.asset(
-      'assets/home/logo.png',
-      height: 32,
-      errorBuilder: (context, error, stackTrace) {
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1F5C4A),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.favorite_rounded,
-                color: Colors.white,
-                size: 16,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                'CalmiBand',
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-                style: GoogleFonts.inter(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: const Color(0xFF1F5C4A),
-                  letterSpacing: -0.5,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
+    // Sementara, ganti dengan logo dari desain tim.
+    return const SibandLogo(size: 32);
   }
+
+  int get _currentStaleAfterSeconds =>
+      (_analysisData?.meta.parameters['stale_after_seconds'] as num?)
+          ?.toInt() ??
+      kDefaultWatchStaleAfterSeconds;
 
   Widget _buildHeader() {
     final activeChildName = _activeChild?.nickname ?? 'Pilih anak';
 
     return Row(
+      key: const Key('home_header'),
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Flexible(child: _buildLogo()),
-        const SizedBox(width: 8),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Semantics(
-              label: 'Notifikasi',
-              button: true,
-              child: IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                icon: const Icon(
-                  Icons.notifications_none_rounded,
-                  color: Color(0xFF1E2A24),
-                  size: 24,
+        const SizedBox(width: 6),
+        Flexible(
+          flex: 2,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Flexible(
+                child: WatchStatusChip(
+                  heartRateService: _hrService,
+                  staleAfterSeconds: _currentStaleAfterSeconds,
+                  activeChildId: _activeChild?.id,
+                  activeChildNickname: _activeChild?.nickname,
+                  onDeviceChanged: () {
+                    if (_activeChild != null) {
+                      _fetchStatsForChild(_activeChild!.id);
+                    }
+                  },
                 ),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Notifikasi belum tersedia'),
-                    ),
-                  );
-                },
               ),
-            ),
-            const SizedBox(width: 6),
-            Semantics(
-              label: 'Ganti Anak Aktif: $activeChildName',
-              button: true,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: _showChildSwitcherSheet,
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 130),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
+              const SizedBox(width: 6),
+              Flexible(
+                child: Semantics(
+                  label: 'Ganti Anak Aktif: $activeChildName',
+                  button: true,
+                  child: InkWell(
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFFD9DED6)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
+                    onTap: _showChildSwitcherSheet,
+                    child: Container(
+                      constraints: const BoxConstraints(
+                        maxWidth: 130,
+                        minHeight: 36,
                       ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.face_rounded,
-                        size: 16,
-                        color: Color(0xFF1F5C4A),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
                       ),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          activeChildName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF1E2A24),
-                          ),
+                      decoration: BoxDecoration(
+                        color: Color.alphaBlend(
+                          const Color(0xFFD9DED6).withValues(alpha: 0.35),
+                          const Color(0xFFF6F4EF),
                         ),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 2),
-                      const Icon(
-                        Icons.arrow_drop_down_rounded,
-                        size: 18,
-                        color: Color(0xFF6F7B74),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.face_outlined,
+                            size: 16,
+                            color: Color(0xFF1F5C4A),
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              activeChildName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF1E2A24),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 16,
+                            color: Color(0xFF6F7B74),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildGreeting() {
-    final activeChildName = _activeChild?.nickname ?? 'anak Anda';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '${_getGreeting()}, $_userName',
-          style: GoogleFonts.inter(
-            fontSize: 22,
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFF1E2A24),
-            height: 1.2,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Yuk, lihat kondisi $activeChildName hari ini dan temukan cara terbaik untuk mendukungnya.',
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            fontWeight: FontWeight.w400,
-            color: const Color(0xFF6F7B74),
-            height: 1.35,
+            ],
           ),
         ),
       ],
     );
   }
 
-  Widget _buildBanner() {
-    return Semantics(
-      label: 'Banner: Yuk Memahami Anak. Ketuk untuk membuka Panduan.',
-      button: true,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () {
-          widget.onNavigateToPanduan?.call();
-        },
+  Widget _buildSummaryChipsRow() {
+    final analysis = _analysisData;
+    if (analysis == null) return const SizedBox.shrink();
+
+    final episodeCount = analysis.episodes.length;
+    final noteCount = analysis.notes.length;
+    final coveragePct = analysis.quality.coveragePercent.round();
+
+    Widget buildChip({
+      required Key key,
+      required String label,
+      required Color background,
+      required Color textColor,
+    }) {
+      return Expanded(
         child: Container(
-          padding: const EdgeInsets.all(18),
+          key: key,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           decoration: BoxDecoration(
-            color: const Color(0xFFE3EEDF),
+            color: background,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
@@ -1103,50 +1069,168 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Yuk Memahami Anak',
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF1F5C4A),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Kenali pemicu dan pola perilaku anak melalui panduan interaktif kami.',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w400,
-                        color: const Color(0xFF1E2A24),
-                        height: 1.3,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF1F5C4A),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.arrow_forward_rounded,
-                  color: Colors.white,
-                  size: 18,
-                ),
-              ),
-            ],
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: textColor,
+            ),
           ),
         ),
-      ),
+      );
+    }
+
+    return Row(
+      key: const Key('home_summary_chips'),
+      children: [
+        buildChip(
+          key: const Key('summary_chip_episode'),
+          label: 'Episode $episodeCount',
+          background: Color.alphaBlend(
+            const Color(0xFFE8A24F).withValues(alpha: 0.12),
+            const Color(0xFFF6F4EF),
+          ),
+          textColor: const Color(0xFF1E2A24),
+        ),
+        const SizedBox(width: 8),
+        buildChip(
+          key: const Key('summary_chip_catatan'),
+          label: 'Catatan $noteCount',
+          background: Color.alphaBlend(
+            const Color(0xFFD9DED6).withValues(alpha: 0.35),
+            const Color(0xFFF6F4EF),
+          ),
+          textColor: const Color(0xFF1E2A24),
+        ),
+        const SizedBox(width: 8),
+        buildChip(
+          key: const Key('summary_chip_cakupan'),
+          label: 'Cakupan $coveragePct%',
+          background: const Color(0xFFE3EEDF),
+          textColor: const Color(0xFF1F5C4A),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildShortcutRow() {
+    Widget buildShortcut({
+      required Key key,
+      required String title,
+      required String subtitle,
+      required IconData icon,
+      required VoidCallback? onTap,
+    }) {
+      return Expanded(
+        child: Semantics(
+          label: title,
+          button: true,
+          child: Container(
+            key: key,
+            decoration: BoxDecoration(
+              color: Color.alphaBlend(
+                const Color(0xFFD9DED6).withValues(alpha: 0.35),
+                const Color(0xFFF6F4EF),
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(20),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: onTap,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 60),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFE3EEDF),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            icon,
+                            size: 18,
+                            color: const Color(0xFF1F5C4A),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF1E2A24),
+                                ),
+                              ),
+                              Text(
+                                subtitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: const Color(0xFF6F7B74),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      key: const Key('home_shortcut_row'),
+      children: [
+        buildShortcut(
+          key: const Key('home_shortcut_panduan'),
+          title: 'Panduan',
+          subtitle: 'Cara mendampingi',
+          icon: Icons.menu_book_outlined,
+          onTap: () => widget.onNavigateToPanduan?.call(),
+        ),
+        const SizedBox(width: 10),
+        buildShortcut(
+          key: const Key('home_shortcut_rekap'),
+          title: 'Rekap',
+          subtitle: 'Ringkasan bulanan',
+          icon: Icons.bar_chart_rounded,
+          onTap: () => widget.onNavigateToRekap?.call(),
+        ),
+      ],
     );
   }
 
@@ -1197,6 +1281,15 @@ class _HomeScreenState extends State<HomeScreen> {
     final Color badgeColor = _resolveStatusBadgeColor(statusLabel);
 
     final String statusText = _hrService.statusText;
+    final HeartbeatState heartbeatState =
+        _resolveHeartbeatState(measurementStateLabel);
+    final DateTime? lastReadingAt =
+        (_hrService.currentMode == Mode.ble &&
+                _hrService.lastBpmReceivedAt != null)
+            ? _hrService.lastBpmReceivedAt
+            : (analysisCurrent?.recordedAt != null
+                ? DateTime.tryParse(analysisCurrent!.recordedAt!)
+                : _hrService.lastBpmReceivedAt);
 
     String baselineSummaryText = 'Baseline belum cukup data';
     String positionDescription = '';
@@ -1222,13 +1315,21 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Container(
+      key: const Key('home_bpm_card'),
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: const Color(0xFF1F5C4A),
-        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF1F5C4A),
+            const Color(0xFF1F5C4A).withValues(alpha: 0.85),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1F5C4A).withValues(alpha: 0.25),
+            color: const Color(0xFF1F5C4A).withValues(alpha: 0.22),
             blurRadius: 14,
             offset: const Offset(0, 4),
           ),
@@ -1253,10 +1354,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(
-                Icons.favorite_rounded,
-                color: Colors.redAccent,
-                size: 18,
+              HeartbeatPulse(
+                bpm: effectiveBpm ?? _hrService.currentBpm,
+                state: heartbeatState,
               ),
             ],
           ),
@@ -1273,13 +1373,35 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  Text(
-                    bpmDisplay,
-                    style: GoogleFonts.inter(
-                      fontSize: 48,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                      letterSpacing: -1,
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    transitionBuilder: (child, animation) {
+                      final slide = Tween<Offset>(
+                        begin: const Offset(0, 0.15),
+                        end: Offset.zero,
+                      ).animate(
+                        CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                      );
+                      return FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(
+                          position: slide,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: Text(
+                      bpmDisplay,
+                      key: ValueKey<String>(bpmDisplay),
+                      style: GoogleFonts.inter(
+                        fontSize: 48,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: -1,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1329,7 +1451,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: _hrService.sensorStatus ==
                               HrSensorStatus.disconnected &&
                           _hrService.currentMode == Mode.ble
-                      ? Colors.redAccent
+                      ? const Color(0xFF94A3B8)
                       : const Color(0xFF1ECE9F),
                 ),
               ),
@@ -1358,6 +1480,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
             ],
           ),
+          if (lastReadingAt != null) ...[
+            const SizedBox(height: 6),
+            LastUpdatedBpmText(lastReadingAt: lastReadingAt),
+          ],
           if (_hrService.needsDeviceRepair) ...[
             const SizedBox(height: 12),
             SizedBox(
@@ -1391,6 +1517,45 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ] else if (_hrService.activeDeviceId == null ||
+              _hrService.pairedDeviceName == null) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton.icon(
+                key: const Key('home_pair_watch_action'),
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PairDeviceScreen(
+                        childId: _activeChild?.id,
+                        childNickname: _activeChild?.nickname,
+                      ),
+                    ),
+                  );
+                  if (mounted && _activeChild != null) {
+                    _fetchStatsForChild(_activeChild!.id);
+                  }
+                },
+                icon: const Icon(Icons.watch_outlined, size: 18),
+                label: Text(
+                  'Pasang jam',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: BorderSide(color: Colors.white.withValues(alpha: 0.45)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
                   ),
                 ),
               ),
@@ -1597,9 +1762,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final remainingCount = episodes.length - visibleEpisodes.length;
 
     return Container(
+      key: const Key('home_episodes_card'),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Color.alphaBlend(
+          const Color(0xFFE8A24F).withValues(alpha: 0.12),
+          const Color(0xFFF6F4EF),
+        ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -1632,7 +1801,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 decoration: BoxDecoration(
                   color: episodes.isNotEmpty
-                      ? const Color(0xFFE8A24F).withValues(alpha: 0.18)
+                      ? const Color(0xFFE8A24F).withValues(alpha: 0.25)
                       : const Color(0xFFE3EEDF),
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -1642,7 +1811,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: episodes.isNotEmpty
-                        ? const Color(0xFFB45309)
+                        ? const Color(0xFF1E2A24)
                         : const Color(0xFF1F5C4A),
                   ),
                 ),
@@ -1675,92 +1844,157 @@ class _HomeScreenState extends State<HomeScreen> {
               final endStr = _formatTimeWib(ep.end);
               final durationStr = _formatDuration(ep.durationSeconds);
               final note = ep.note;
+              final epKey = '${ep.index}_${ep.start}';
+              final shouldAnimate = !_animatedEpisodeKeys.contains(epKey);
 
-              return Container(
-                margin: EdgeInsets.only(
-                  bottom: idx == visibleEpisodes.length - 1 ? 0 : 8,
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF6F4EF),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE5E0D5)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text(
-                          '$startStr–$endStr ($durationStr)',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF1E2A24),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color:
-                                const Color(0xFFE8A24F).withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            'Puncak ${ep.peakBpm} BPM (+${ep.deltaFromMedian.round()})',
+              return EpisodeEntryFadeIn(
+                key: ValueKey<String>('episode_fade_$epKey'),
+                episodeKey: epKey,
+                staggerIndex: idx,
+                animateOnMount: shouldAnimate,
+                onAnimationStarted: () {
+                  _animatedEpisodeKeys.add(epKey);
+                },
+                child: Container(
+                  margin: EdgeInsets.only(
+                    bottom: idx == visibleEpisodes.length - 1 ? 0 : 8,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF6F4EF),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            '$startStr–$endStr ($durationStr)',
                             style: GoogleFonts.inter(
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
-                              color: const Color(0xFFB45309),
+                              color: const Color(0xFF1E2A24),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          note != null
-                              ? getEventTypeIcon(note.type)
-                              : Icons.info_outline_rounded,
-                          size: 14,
-                          color: note != null
-                              ? const Color(0xFF1F5C4A)
-                              : const Color(0xFF6F7B74),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            note != null
-                                ? '${getEventTypeName(note.type)}${note.textPreview.isNotEmpty ? ' · ${note.textPreview}' : ''}'
-                                : 'Tanpa catatan kejadian terkait',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: note != null
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
-                              color: note != null
-                                  ? const Color(0xFF1E2A24)
-                                  : const Color(0xFF6F7B74),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8A24F)
+                                  .withValues(alpha: 0.25),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'Puncak ${ep.peakBpm} BPM (+${ep.deltaFromMedian.round()})',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF1E2A24),
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                    if (note != null)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            getEventTypeIcon(note.type),
+                            size: 14,
+                            color: const Color(0xFF1F5C4A),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '${getEventTypeName(note.type)}${note.textPreview.isNotEmpty ? ' · ${note.textPreview}' : ''}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF1E2A24),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    else
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFD9DED6),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'Belum dicatat',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: const Color(0xFF6F7B74),
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _activeChild == null
+                                ? null
+                                : () async {
+                                    final childId = _activeChild!.id;
+                                    final parsedStart =
+                                        DateTime.tryParse(ep.start)?.toLocal();
+                                    final result = await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => EventNoteScreen(
+                                          childId: childId,
+                                          initialOccurredAt: parsedStart,
+                                        ),
+                                      ),
+                                    );
+                                    if (result == true &&
+                                        _activeChild != null) {
+                                      _fetchStatsForChild(_activeChild!.id);
+                                    }
+                                  },
+                            style: TextButton.styleFrom(
+                              foregroundColor: const Color(0xFF1F5C4A),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: Text(
+                              'Tambah catatan',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                   ],
+                ),
                 ),
               );
             }),
@@ -1776,7 +2010,144 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ],
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => GuideCalmingScreen(
+                      childId: _activeChild?.id,
+                    ),
+                  ),
+                );
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF1F5C4A),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(
+                'Lihat panduan menenangkan',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPatternEntryCard() {
+    final analysis = _analysisData;
+    final child = _activeChild;
+    if (analysis == null || child == null) {
+      return const SizedBox.shrink();
+    }
+
+    final summary = patternSummaryText(analysis);
+
+    return Semantics(
+      label: 'Lihat pola. $summary',
+      button: true,
+      child: Container(
+        key: const Key('home_pattern_entry_card'),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE3EEDF),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PatternScreen(
+                    analysis: analysis,
+                    childId: child.id,
+                  ),
+                ),
+              );
+            },
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 64),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1F5C4A).withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.insights_rounded,
+                        size: 20,
+                        color: Color(0xFF1F5C4A),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Lihat pola',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF1E2A24),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            summary,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: const Color(0xFF6F7B74),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      size: 22,
+                      color: Color(0xFF1F5C4A),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1838,7 +2209,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 10),
         Text(
-          'Perubahan detak jantung bukan bukti stres.',
+          'Detak jantung naik bisa dipicu banyak hal.',
           textAlign: TextAlign.center,
           style: GoogleFonts.inter(
             fontSize: 12,
@@ -1926,14 +2297,14 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Container(
               padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Color(0xFFFFEBEE),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8A24F).withValues(alpha: 0.16),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.error_outline_rounded,
                 size: 54,
-                color: Colors.redAccent,
+                color: Color(0xFFE8A24F),
               ),
             ),
             const SizedBox(height: 20),
@@ -2044,55 +2415,111 @@ class _HomeScreenState extends State<HomeScreen> {
           builder: (context, constraints) {
             final horizontalPadding = constraints.maxWidth * 0.06;
 
-            return SingleChildScrollView(
-              padding: EdgeInsets.symmetric(
-                horizontal: horizontalPadding,
-                vertical: 16,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Header
-                  _buildHeader(),
-                  const SizedBox(height: 20),
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: RefreshIndicator(
+                    color: const Color(0xFF1F5C4A),
+                    onRefresh: _handlePullToRefresh,
+                    child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.fromLTRB(
+                      horizontalPadding,
+                      16,
+                      horizontalPadding,
+                      88,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // 1. Header tipis (logo + chip jam + nama anak)
+                        _buildHeader(),
+                        const SizedBox(height: 16),
 
-                  // Sapaan
-                  _buildGreeting(),
-                  const SizedBox(height: 18),
+                        // 2. Kartu BPM utama (gradien hijau tua -> 85%, putih, denyut)
+                        _buildMonitoringCard(),
+                        const SizedBox(height: 14),
 
-                  // Banner Yuk Memahami Anak
-                  _buildBanner(),
-                  const SizedBox(height: 18),
+                        // 3. Tiga chip ringkas (Episode, Catatan, Cakupan)
+                        if (_analysisData != null) ...[
+                          _buildSummaryChipsRow(),
+                          const SizedBox(height: 18),
+                        ] else
+                          const SizedBox(height: 4),
 
-                  // Kartu Hijau PEMANTAUAN DETAK JANTUNG (Kartu Detak Jantung Sekarang)
-                  _buildMonitoringCard(),
-                  const SizedBox(height: 18),
+                        // 4. Grafik Pemantauan Time-Series BPM
+                        Container(
+                          key: const Key('home_chart_section'),
+                          child: HomeMonitoringChartCard(
+                            analysisData: _analysisData,
+                            baselineData: _baselineData,
+                            hourlyAverages: _hourlyAverages,
+                            isLoadingAnalysis: _isLoadingAnalysis,
+                          ),
+                        ),
+                        if (_analysisLoadFailed) ...[
+                          const SizedBox(height: 8),
+                          _buildAnalysisErrorNotice(),
+                        ],
+                        const SizedBox(height: 18),
 
-                  // Grafik Pemantauan Time-Series BPM
-                  HomeMonitoringChartCard(
-                    analysisData: _analysisData,
-                    baselineData: _baselineData,
-                    hourlyAverages: _hourlyAverages,
-                    isLoadingAnalysis: _isLoadingAnalysis,
+                        // 5 & 6. Ringkasan Episode + Kartu Lihat Pola
+                        if (_analysisData != null) ...[
+                          _buildEpisodesSummaryCard(),
+                          const SizedBox(height: 14),
+                          _buildPatternEntryCard(),
+                          const SizedBox(height: 18),
+                        ] else
+                          const SizedBox(height: 2),
+
+                        // 7. Baris pintasan dua tombol (Panduan & Rekap)
+                        _buildShortcutRow(),
+                        const SizedBox(height: 16),
+
+                        // Tombol + Catatan kejadian (tetap ada di bawah halaman)
+                        _buildEventNoteButton(),
+                        const SizedBox(height: 16),
+                      ],
+                    ),
+                    ),
                   ),
-                  if (_analysisLoadFailed) ...[
-                    const SizedBox(height: 8),
-                    _buildAnalysisErrorNotice(),
-                  ],
-                  const SizedBox(height: 18),
-
-                  // Ringkasan Episode Kenaikan BPM yang ringkas (jika data analisis tersedia)
-                  if (_analysisData != null) ...[
-                    _buildEpisodesSummaryCard(),
-                    const SizedBox(height: 18),
-                  ] else
-                    const SizedBox(height: 2),
-
-                  // Tombol + Catatan kejadian dan teks keterangan
-                  _buildEventNoteButton(),
-                  const SizedBox(height: 16),
-                ],
-              ),
+                ),
+                if (widget.isActiveTab && _activeChild != null)
+                  Positioned(
+                    right: 16,
+                    bottom: 16,
+                    child: FloatingActionButton.extended(
+                      key: const Key('fab_catat_kejadian'),
+                      heroTag: null,
+                      backgroundColor: const Color(0xFFE8A24F),
+                      foregroundColor: const Color(0xFF1E2A24),
+                      elevation: 3,
+                      onPressed: () async {
+                        final child = _activeChild;
+                        if (child == null) return;
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                EventNoteScreen(childId: child.id),
+                          ),
+                        );
+                        if (result == true && _activeChild != null) {
+                          _fetchStatsForChild(_activeChild!.id);
+                        }
+                      },
+                      icon: const Icon(Icons.add_rounded, size: 20),
+                      label: Text(
+                        'Catat kejadian',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF1E2A24),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             );
           },
         ),
@@ -2103,26 +2530,43 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildAnalysisErrorNotice() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: Color.alphaBlend(
+          const Color(0xFFD9DED6).withValues(alpha: 0.35),
+          const Color(0xFFF6F4EF),
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.info_outline_rounded,
-            size: 16,
-            color: Color(0xFF64748B),
+          Container(
+            width: 28,
+            height: 28,
+            decoration: const BoxDecoration(
+              color: Color(0xFFE3EEDF),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.info_outline_rounded,
+              size: 16,
+              color: Color(0xFF1F5C4A),
+            ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               'Data analisis belum bisa dimuat',
               style: GoogleFonts.inter(
                 fontSize: 12,
-                color: const Color(0xFF64748B),
+                color: const Color(0xFF6F7B74),
               ),
             ),
           ),
@@ -2146,6 +2590,149 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Widget kecil tersendiri untuk menampilkan waktu pembaruan bacaan terakhir
+/// ("Diperbarui baru saja", "Diperbarui N dtk lalu", "Diperbarui N mnt lalu")
+/// yang diperbarui tiap 10 detik tanpa membangun ulang seluruh Beranda.
+class LastUpdatedBpmText extends StatefulWidget {
+  final DateTime lastReadingAt;
+
+  const LastUpdatedBpmText({
+    super.key,
+    required this.lastReadingAt,
+  });
+
+  static String formatLabel(DateTime lastReadingAt, {DateTime? now}) {
+    final diffSec = math.max(
+      0,
+      (now ?? DateTime.now()).difference(lastReadingAt).inSeconds,
+    );
+    if (diffSec < 10) {
+      return 'Diperbarui baru saja';
+    }
+    if (diffSec < 60) {
+      return 'Diperbarui $diffSec dtk lalu';
+    }
+    return 'Diperbarui ${diffSec ~/ 60} mnt lalu';
+  }
+
+  @override
+  State<LastUpdatedBpmText> createState() => _LastUpdatedBpmTextState();
+}
+
+class _LastUpdatedBpmTextState extends State<LastUpdatedBpmText> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      LastUpdatedBpmText.formatLabel(widget.lastReadingAt),
+      style: GoogleFonts.inter(
+        fontSize: 11,
+        fontWeight: FontWeight.w400,
+        color: Colors.white.withValues(alpha: 0.72),
+      ),
+    );
+  }
+}
+
+/// Pembungkus fade-in berurutan (jeda 60 ms per kartu) untuk kartu episode
+/// yang hanya memutar animasi saat pertama kali kartu tersebut tampil.
+class EpisodeEntryFadeIn extends StatefulWidget {
+  final String episodeKey;
+  final int staggerIndex;
+  final bool animateOnMount;
+  final VoidCallback onAnimationStarted;
+  final Widget child;
+
+  @visibleForTesting
+  static int animationTriggerCount = 0;
+
+  const EpisodeEntryFadeIn({
+    super.key,
+    required this.episodeKey,
+    required this.staggerIndex,
+    required this.animateOnMount,
+    required this.onAnimationStarted,
+    required this.child,
+  });
+
+  @override
+  State<EpisodeEntryFadeIn> createState() => _EpisodeEntryFadeInState();
+}
+
+class _EpisodeEntryFadeInState extends State<EpisodeEntryFadeIn>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _opacity;
+  bool _started = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final delayMs = widget.staggerIndex * 60;
+    final totalMs = 240 + delayMs;
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: totalMs),
+    );
+    final beginFraction = totalMs > 0 ? delayMs / totalMs : 0.0;
+    _opacity = CurvedAnimation(
+      parent: _controller,
+      curve: Interval(beginFraction, 1.0, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    final disableAnimations =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (widget.animateOnMount) {
+      widget.onAnimationStarted();
+      if (disableAnimations) {
+        _controller.value = 1.0;
+      } else {
+        EpisodeEntryFadeIn.animationTriggerCount++;
+        _controller.forward(from: 0.0);
+      }
+    } else {
+      _controller.value = 1.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _opacity,
+      child: widget.child,
     );
   }
 }

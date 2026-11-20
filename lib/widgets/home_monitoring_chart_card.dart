@@ -5,7 +5,56 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/analysis_model.dart';
 import '../utils/event_type_helper.dart';
 
-class HomeMonitoringChartCard extends StatelessWidget {
+/// Jumlah menit data yang terlihat dalam satu layar (viewport) grafik.
+const double visibleMinutes = 60;
+
+const double _yAxisWidth = 34;
+const double _plotHeight = 180;
+const double _xLabelHeight = 22;
+const double _plotPadX = 8;
+const double _tapRadius = 16;
+const double _pinHeaderHeight = 18;
+
+const Color _colorBelow = Color(0xFF8FA3B5);
+const Color _colorNormal = Color(0xFF2F8F83);
+const Color _colorAbove = Color(0xFFE8A24F);
+const Color _colorEpisode = Color(0xFFEA7A1E);
+const Color _colorNeutral = Color(0xFF6F7B74);
+
+typedef _Pt = ({int ms, double x, double bpm, String rawT});
+
+class _ChartGeometry {
+  final List<_Pt> points;
+  final int firstMs;
+  final int lastMs;
+  final double maxX;
+  final double minY;
+  final double maxY;
+  final double yInterval;
+  final double canvasW;
+
+  const _ChartGeometry({
+    required this.points,
+    required this.firstMs,
+    required this.lastMs,
+    required this.maxX,
+    required this.minY,
+    required this.maxY,
+    required this.yInterval,
+    required this.canvasW,
+  });
+
+  double get plotW => canvasW - 2 * _plotPadX;
+
+  double xPx(double minutes) =>
+      _plotPadX + (minutes / maxX).clamp(0.0, 1.0) * plotW;
+
+  double yPx(double bpm) => _plotHeight * (maxY - bpm) / (maxY - minY);
+
+  Offset offsetOf(_Pt p) => Offset(xPx(p.x), yPx(p.bpm));
+}
+
+class HomeMonitoringChartCard extends StatefulWidget {
   final AnalysisModel? analysisData;
   final Map<String, dynamic>? baselineData;
   final List<Map<String, dynamic>> hourlyAverages;
@@ -35,11 +84,68 @@ class HomeMonitoringChartCard extends StatelessWidget {
   }
 
   @override
+  State<HomeMonitoringChartCard> createState() =>
+      _HomeMonitoringChartCardState();
+}
+
+class _HomeMonitoringChartCardState extends State<HomeMonitoringChartCard> {
+  final ScrollController _scrollController = ScrollController();
+  int? _selectedMs;
+  bool _showJumpToNow = false;
+
+  AnalysisModel? get _analysis => widget.analysisData;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+    _jumpToEndAfterFrame();
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeMonitoringChartCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.analysisData != widget.analysisData) {
+      final wasAtEnd =
+          !_scrollController.hasClients ||
+          (_scrollController.position.maxScrollExtent -
+                  _scrollController.position.pixels) <=
+              2;
+      if (wasAtEnd) _jumpToEndAfterFrame();
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _jumpToEndAfterFrame() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      _onScroll();
+    });
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+    final far = (pos.maxScrollExtent - pos.pixels) > pos.viewportDimension;
+    if (far != _showJumpToNow && mounted) {
+      setState(() => _showJumpToNow = far);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final analysis = analysisData;
+    final analysis = widget.analysisData;
     final series = analysis?.series ?? const <AnalysisSeriesPoint>[];
     final bool hasTimeSeries = series.isNotEmpty;
-    final bool hasHourlyFallback = !hasTimeSeries && hourlyAverages.isNotEmpty;
+    final bool hasHourlyFallback =
+        !hasTimeSeries && widget.hourlyAverages.isNotEmpty;
 
     final String subtitleText;
     final String footerText;
@@ -54,6 +160,9 @@ class HomeMonitoringChartCard extends StatelessWidget {
       subtitleText = 'Menunggu bacaan sensor detak jantung';
       footerText = 'Pemantauan detak jantung · bukan diagnosis';
     }
+
+    final bool showResolutionNote =
+        hasTimeSeries && (analysis?.resolutionSeconds ?? 0) > 1;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -94,10 +203,20 @@ class HomeMonitoringChartCard extends StatelessWidget {
                         color: const Color(0xFF6F7B74),
                       ),
                     ),
+                    if (showResolutionNote) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Tiap titik = nilai tengah per ${analysis!.resolutionSeconds} detik',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: const Color(0xFF6F7B74),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
-              if (isLoadingAnalysis)
+              if (widget.isLoadingAnalysis)
                 const SizedBox(
                   width: 16,
                   height: 16,
@@ -116,9 +235,9 @@ class HomeMonitoringChartCard extends StatelessWidget {
               runSpacing: 6,
               children: [
                 _buildLegendItem(
-                  color: const Color(0xFF1F5C4A),
+                  color: _colorNormal,
                   label: 'BPM aktual',
-                  isLine: true,
+                  isDot: true,
                 ),
                 _buildLegendItem(
                   color: const Color(0xFFE3EEDF),
@@ -133,7 +252,7 @@ class HomeMonitoringChartCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            _buildTimeSeriesLineChart(analysis!),
+            _buildTimeSeriesScatterChart(analysis!),
           ] else if (hasHourlyFallback) ...[
             const SizedBox(height: 4),
             _buildHourlyFallbackBars(),
@@ -161,18 +280,19 @@ class HomeMonitoringChartCard extends StatelessWidget {
   Widget _buildLegendItem({
     required Color color,
     required String label,
-    bool isLine = false,
+    bool isDot = false,
     bool isBox = false,
   }) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: isLine ? 14 : 10,
-          height: isLine ? 3 : 10,
+          width: isDot ? 8 : 10,
+          height: isDot ? 8 : 10,
           decoration: BoxDecoration(
             color: color,
-            borderRadius: BorderRadius.circular(isLine ? 2 : 3),
+            shape: isDot ? BoxShape.circle : BoxShape.rectangle,
+            borderRadius: isDot ? null : BorderRadius.circular(3),
             border: isBox && color == const Color(0xFFE3EEDF)
                 ? Border.all(
                     color: const Color(0xFF1F5C4A).withValues(alpha: 0.4),
@@ -194,421 +314,603 @@ class HomeMonitoringChartCard extends StatelessWidget {
     );
   }
 
-  Widget _buildTimeSeriesLineChart(AnalysisModel analysis) {
-    final series = analysis.series;
-    final parsedPoints = <({DateTime time, int ms, double bpm, String rawT})>[];
+  /// Status terhadap baseline (aturan sama dengan kartu BPM di Beranda).
+  static String _statusLabel({
+    required int bpm,
+    required bool sufficient,
+    required double? p25,
+    required double? p75,
+    required int margin,
+  }) {
+    if (sufficient && p25 != null && p75 != null) {
+      final threshold = p75 + margin;
+      if (bpm <= p75) return 'Dalam rentang biasa';
+      if (bpm <= threshold) return 'Sedikit di atas baseline';
+      return 'Jauh di atas baseline';
+    }
+    if (!sufficient) return 'Baseline belum cukup data';
+    return 'Belum ada pembacaan';
+  }
 
-    for (final pt in series) {
+  static String _clockFromRaw(String raw, {required bool withSeconds}) {
+    final m = RegExp(r'T(\d{2}):(\d{2}):(\d{2})').firstMatch(raw);
+    if (m != null) {
+      return withSeconds
+          ? '${m.group(1)}.${m.group(2)}.${m.group(3)}'
+          : '${m.group(1)}.${m.group(2)}';
+    }
+    final dt = DateTime.tryParse(raw);
+    if (dt == null) return raw;
+    final wib = dt.toUtc().add(const Duration(hours: 7));
+    final hh = wib.hour.toString().padLeft(2, '0');
+    final mm = wib.minute.toString().padLeft(2, '0');
+    final ss = wib.second.toString().padLeft(2, '0');
+    return withSeconds ? '$hh.$mm.$ss' : '$hh.$mm';
+  }
+
+  void _handleTap(Offset local, _ChartGeometry g) {
+    _Pt? best;
+    double bestDistance = _tapRadius;
+    for (final p in g.points) {
+      final d = (g.offsetOf(p) - local).distance;
+      if (d <= bestDistance) {
+        best = p;
+        bestDistance = d;
+      }
+    }
+    setState(() => _selectedMs = best?.ms);
+  }
+
+  Widget _buildTimeSeriesScatterChart(AnalysisModel analysis) {
+    final parsed = <_Pt>[];
+    for (final pt in analysis.series) {
       final dt = DateTime.tryParse(pt.t);
       if (dt != null) {
-        parsedPoints.add((
-          time: dt,
+        parsed.add((
           ms: dt.millisecondsSinceEpoch,
+          x: 0.0,
           bpm: pt.bpm.toDouble(),
           rawT: pt.t,
         ));
       }
     }
+    if (parsed.isEmpty) return _buildEmptyChartState();
+    parsed.sort((a, b) => a.ms.compareTo(b.ms));
 
-    if (parsedPoints.isEmpty) {
-      return _buildEmptyChartState();
-    }
+    final firstMs = parsed.first.ms;
+    final lastMs = parsed.last.ms;
+    final double maxX = math.max(1.0, (lastMs - firstMs) / 60000.0);
+    final points = parsed
+        .map(
+          (p) => (
+            ms: p.ms,
+            x: (p.ms - firstMs) / 60000.0,
+            bpm: p.bpm,
+            rawT: p.rawT,
+          ),
+        )
+        .toList();
 
-    final firstMs = parsedPoints.first.ms;
-    final lastMs = parsedPoints.last.ms;
-    const minX = 0.0;
-    final maxX = math.max(1.0, (lastMs - firstMs) / 60000.0);
+    final baseline = analysis.baseline;
+    final bool sufficient =
+        baseline.sufficient && baseline.p25 != null && baseline.p75 != null;
+    final int episodeMargin =
+        (analysis.meta.parameters['episode_margin_bpm'] as num?)?.toInt() ?? 10;
 
-    final int gapMinSeconds =
-        (analysis.meta.parameters['gap_min_seconds'] as num?)?.toInt() ?? 150;
+    double minBpm = points.map((e) => e.bpm).reduce(math.min);
+    double maxBpm = points.map((e) => e.bpm).reduce(math.max);
+    if (baseline.p25 != null) minBpm = math.min(minBpm, baseline.p25!);
+    if (baseline.p75 != null) maxBpm = math.max(maxBpm, baseline.p75!);
+    final double minY = ((minBpm - 10) / 10).floorToDouble() * 10;
+    final double maxY = ((maxBpm + 12) / 10).ceilToDouble() * 10;
+    final double yInterval = math.max(
+      10.0,
+      ((maxY - minY) / 4).roundToDouble(),
+    );
 
-    final gapRangesMs = <({int fromMs, int toMs})>[];
-    for (final g in analysis.sensorGaps) {
-      final f = DateTime.tryParse(g.from)?.millisecondsSinceEpoch;
-      final t = DateTime.tryParse(g.to)?.millisecondsSinceEpoch;
-      if (f != null && t != null) {
-        gapRangesMs.add((fromMs: f, toMs: t));
-      }
-    }
-
-    final spots = <FlSpot>[];
-    for (int i = 0; i < parsedPoints.length; i++) {
-      final curr = parsedPoints[i];
-      if (i > 0) {
-        final prev = parsedPoints[i - 1];
-        final diffSec = (curr.ms - prev.ms) / 1000.0;
-        final isExplicitGap = gapRangesMs.any(
-          (g) =>
-              prev.ms >= g.fromMs - 1000 &&
-              curr.ms <= g.toMs + 1000 &&
-              diffSec > gapMinSeconds,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double viewport = constraints.maxWidth - _yAxisWidth;
+        final double canvasW = math.max(
+          viewport,
+          maxX / visibleMinutes * viewport,
         );
-        if (diffSec > gapMinSeconds || isExplicitGap) {
-          spots.add(FlSpot.nullSpot);
-        }
-      }
-      final xMin = (curr.ms - firstMs) / 60000.0;
-      spots.add(FlSpot(xMin, curr.bpm));
-    }
+        final g = _ChartGeometry(
+          points: points,
+          firstMs: firstMs,
+          lastMs: lastMs,
+          maxX: maxX,
+          minY: minY,
+          maxY: maxY,
+          yInterval: yInterval,
+          canvasW: canvasW,
+        );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildChartArea(analysis, g, viewport, sufficient, episodeMargin),
+            _buildSelectedPanel(analysis, g, sufficient, episodeMargin),
+          ],
+        );
+      },
+    );
+  }
 
-    final verticalRanges = <VerticalRangeAnnotation>[];
-    final peakVerticalLines = <VerticalLine>[];
-    final peakSpotKeys = <String>{};
+  Widget _buildChartArea(
+    AnalysisModel analysis,
+    _ChartGeometry g,
+    double viewport,
+    bool sufficient,
+    int episodeMargin,
+  ) {
+    final baseline = analysis.baseline;
+    final p25 = baseline.p25;
+    final p75 = baseline.p75;
 
+    // Titik (scatter)
+    final spots = g.points.map((p) {
+      final style = _dotStyle(p.bpm, sufficient, p75, episodeMargin);
+      return ScatterSpot(p.x, p.bpm, radius: style.radius, color: style.color);
+    }).toList();
+
+    // Blok episode
+    final episodeBlocks = <Widget>[];
     for (final ep in analysis.episodes) {
-      final epStartMs = DateTime.tryParse(ep.start)?.millisecondsSinceEpoch;
-      final epEndMs = DateTime.tryParse(ep.end)?.millisecondsSinceEpoch;
-      if (epStartMs == null || epEndMs == null) continue;
-
-      final double rawX1 = ((epStartMs - firstMs) / 60000.0).clamp(minX, maxX);
-      final double rawX2 = ((epEndMs - firstMs) / 60000.0).clamp(minX, maxX);
-      final double minVisualWidth = math.max(0.4, (maxX - minX) * 0.02);
-      final double x1 = rawX1;
-      final double x2 = math.max(rawX1 + minVisualWidth, rawX2);
-
-      verticalRanges.add(
-        VerticalRangeAnnotation(
-          x1: x1,
-          x2: math.min(maxX, x2),
-          color: const Color(0xFFE8A24F).withValues(alpha: 0.24),
+      final s = DateTime.tryParse(ep.start)?.millisecondsSinceEpoch;
+      final e = DateTime.tryParse(ep.end)?.millisecondsSinceEpoch;
+      if (s == null || e == null) continue;
+      final left = g.xPx((s - g.firstMs) / 60000.0);
+      final right = g.xPx((e - g.firstMs) / 60000.0);
+      final width = math.max(8.0, right - left);
+      episodeBlocks.add(
+        Positioned(
+          left: left,
+          top: 0,
+          width: width,
+          height: _plotHeight,
+          child: Container(
+            color: _colorAbove.withValues(alpha: 0.24),
+            alignment: Alignment.topCenter,
+            child: Container(
+              margin: const EdgeInsets.only(top: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              decoration: BoxDecoration(
+                color: const Color(0xFFB45309),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                '+${ep.deltaFromMedian.round()}',
+                maxLines: 1,
+                style: GoogleFonts.inter(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
         ),
       );
+    }
 
-      ({DateTime time, int ms, double bpm, String rawT})? peakPt;
-      for (final pt in parsedPoints) {
-        if (pt.ms >= epStartMs && pt.ms <= epEndMs) {
-          if (peakPt == null || pt.bpm > peakPt.bpm) {
-            peakPt = pt;
-          }
+    // Area jeda sensor
+    final gapRects = <(double, double)>[];
+    for (final gap in analysis.sensorGaps) {
+      final f = DateTime.tryParse(gap.from)?.millisecondsSinceEpoch;
+      final t = DateTime.tryParse(gap.to)?.millisecondsSinceEpoch;
+      if (f == null || t == null) continue;
+      gapRects.add((
+        g.xPx((f - g.firstMs) / 60000.0),
+        g.xPx((t - g.firstMs) / 60000.0),
+      ));
+    }
+
+    final yTicks = <double>[];
+    for (double v = g.minY; v <= g.maxY + 0.001; v += g.yInterval) {
+      yTicks.add(v);
+    }
+
+    // Label sumbu X
+    final double pxPerMin = g.plotW / g.maxX;
+    const steps = [1, 2, 5, 10, 15, 30, 60, 120, 240];
+    final int stepMin = steps.firstWhere(
+      (s) => s * pxPerMin >= 56,
+      orElse: () => steps.last,
+    );
+    final xLabels = <Widget>[];
+    for (int m = 0; m <= g.maxX.floor(); m += stepMin) {
+      final ms = g.firstMs + m * 60000;
+      final wib = DateTime.fromMillisecondsSinceEpoch(
+        ms,
+        isUtc: true,
+      ).add(const Duration(hours: 7));
+      final label =
+          '${wib.hour.toString().padLeft(2, '0')}:${wib.minute.toString().padLeft(2, '0')}';
+      xLabels.add(
+        Positioned(
+          left: g.xPx(m.toDouble()) - 24,
+          top: 6,
+          width: 48,
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              color: const Color(0xFF6F7B74),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Pin catatan
+    final hasNotes = analysis.notes.isNotEmpty;
+    final pins = <Widget>[];
+    bool hasSecondRow = false;
+    if (hasNotes) {
+      final totalSpanMs = math.max(1, g.lastMs - g.firstMs);
+      double? lastRow0Px;
+      for (final note in analysis.notes) {
+        final ms = DateTime.tryParse(note.at)?.millisecondsSinceEpoch;
+        final ratio = ms != null
+            ? ((ms - g.firstMs) / totalSpanMs).clamp(0.0, 1.0)
+            : 0.5;
+        final px = _plotPadX + ratio * g.plotW;
+        int row = 0;
+        if (lastRow0Px != null && (px - lastRow0Px).abs() < 120) {
+          row = 1;
+          hasSecondRow = true;
+        } else {
+          lastRow0Px = px;
         }
-      }
-
-      if (peakPt != null) {
-        final peakX = (peakPt.ms - firstMs) / 60000.0;
-        peakSpotKeys.add('${peakX.toStringAsFixed(3)}_${peakPt.bpm.round()}');
-        peakVerticalLines.add(
-          VerticalLine(
-            x: peakX,
-            color: const Color(0xFFD97706),
-            strokeWidth: 1.2,
-            dashArray: [4, 4],
-            label: VerticalLineLabel(
-              show: true,
-              alignment: Alignment.topRight,
-              padding: const EdgeInsets.only(left: 4, bottom: 2),
-              style: GoogleFonts.inter(
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFFB45309),
+        final double left = (px - 8)
+            .clamp(0.0, math.max(0.0, g.canvasW - 150))
+            .toDouble();
+        final label =
+            '${HomeMonitoringChartCard.formatTimeWib(note.at)} · ${getEventTypeName(note.type)}';
+        pins.add(
+          Positioned(
+            left: left,
+            top: _pinHeaderHeight + row * 26.0,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 150),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFD9DED6)),
               ),
-              labelResolver: (_) =>
-                  '${ep.peakBpm} BPM (${formatTimeWib(ep.start)})',
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    getEventTypeIcon(note.type),
+                    size: 12,
+                    color: const Color(0xFF1F5C4A),
+                  ),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF1E2A24),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
       }
     }
+    final double laneHeight = hasSecondRow ? 54 : 28;
+    final double pinsSectionHeight = _pinHeaderHeight + laneHeight + 6;
 
-    final horizontalRanges = <HorizontalRangeAnnotation>[];
-    final horizontalLines = <HorizontalLine>[];
-    final baseline = analysis.baseline;
-
-    if (baseline.sufficient && baseline.p25 != null && baseline.p75 != null) {
-      horizontalRanges.add(
-        HorizontalRangeAnnotation(
-          y1: baseline.p25!,
-          y2: baseline.p75!,
-          color: const Color(0xFFE3EEDF).withValues(alpha: 0.8),
-        ),
-      );
-      if (baseline.median != null) {
-        horizontalLines.add(
-          HorizontalLine(
-            y: baseline.median!,
-            color: const Color(0xFF1F5C4A).withValues(alpha: 0.35),
-            strokeWidth: 1,
-            dashArray: [4, 4],
-          ),
-        );
-      }
+    _Pt? selected;
+    for (final p in g.points) {
+      if (p.ms == _selectedMs) selected = p;
     }
 
-    double minBpm = parsedPoints.map((e) => e.bpm).reduce(math.min);
-    double maxBpm = parsedPoints.map((e) => e.bpm).reduce(math.max);
-    if (baseline.p25 != null) minBpm = math.min(minBpm, baseline.p25!);
-    if (baseline.p75 != null) maxBpm = math.max(maxBpm, baseline.p75!);
+    final canvas = SizedBox(
+      width: g.canvasW,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapUp: (d) => _handleTap(d.localPosition, g),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              key: const Key('chart_plot'),
+              width: g.canvasW,
+              height: _plotHeight,
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: CustomPaint(
+                      painter: _PlotBackgroundPainter(
+                        g: g,
+                        yTicks: yTicks,
+                        bandP25: sufficient ? p25 : null,
+                        bandP75: sufficient ? p75 : null,
+                        median: sufficient ? baseline.median : null,
+                        gapRects: gapRects,
+                      ),
+                    ),
+                  ),
+                  ...episodeBlocks,
+                  Positioned.fill(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: _plotPadX,
+                      ),
+                      child: ScatterChart(
+                        ScatterChartData(
+                          minX: 0,
+                          maxX: g.maxX,
+                          minY: g.minY,
+                          maxY: g.maxY,
+                          scatterSpots: spots,
+                          backgroundColor: Colors.transparent,
+                          clipData: const FlClipData.none(),
+                          gridData: const FlGridData(show: false),
+                          borderData: FlBorderData(show: false),
+                          titlesData: const FlTitlesData(show: false),
+                          scatterTouchData: ScatterTouchData(enabled: false),
+                        ),
+                        swapAnimationDuration: Duration.zero,
+                      ),
+                    ),
+                  ),
+                  if (selected != null)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: CustomPaint(
+                          key: const Key('chart_selection_ring'),
+                          painter: _RingPainter(g.offsetOf(selected)),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            SizedBox(
+              height: _xLabelHeight,
+              width: g.canvasW,
+              child: Stack(children: xLabels),
+            ),
+            if (hasNotes)
+              Container(
+                width: g.canvasW,
+                height: pinsSectionHeight,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF6F4EF),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Stack(children: pins),
+              ),
+          ],
+        ),
+      ),
+    );
 
-    final double minY = ((minBpm - 10) / 10).floorToDouble() * 10;
-    final double maxY = ((maxBpm + 12) / 10).ceilToDouble() * 10;
-    final double yInterval =
-        math.max(10.0, ((maxY - minY) / 4).roundToDouble());
-    final double xInterval = math.max(1.0, (maxX - minX) / 4);
+    final double scrollHeight =
+        _plotHeight + _xLabelHeight + (hasNotes ? pinsSectionHeight : 0);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          height: 210,
-          child: LineChart(
-            LineChartData(
-              minX: minX,
-              maxX: maxX,
-              minY: minY,
-              maxY: maxY,
-              clipData: const FlClipData.all(),
-              gridData: FlGridData(
-                show: true,
-                drawVerticalLine: false,
-                horizontalInterval: yInterval,
-                getDrawingHorizontalLine: (value) => const FlLine(
-                  color: Color(0xFFF1F5F9),
-                  strokeWidth: 1,
+          key: const Key('chart_y_axis'),
+          width: _yAxisWidth,
+          height: _plotHeight + _xLabelHeight,
+          child: Stack(
+            children: [
+              for (final v in yTicks)
+                if (v != g.minY && v != g.maxY)
+                  Positioned(
+                    top: g.yPx(v) - 7,
+                    left: 0,
+                    right: 6,
+                    child: Text(
+                      v.round().toString(),
+                      textAlign: TextAlign.right,
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        color: const Color(0xFF6F7B74),
+                      ),
+                    ),
+                  ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: SizedBox(
+            height: scrollHeight,
+            child: Stack(
+              children: [
+                SingleChildScrollView(
+                  key: const Key('chart_scroll'),
+                  controller: _scrollController,
+                  scrollDirection: Axis.horizontal,
+                  physics: const ClampingScrollPhysics(),
+                  child: canvas,
                 ),
-              ),
-              borderData: FlBorderData(
-                show: true,
-                border: const Border(
-                  bottom: BorderSide(color: Color(0xFFE2E8F0)),
-                  left: BorderSide(color: Color(0xFFE2E8F0)),
-                ),
-              ),
-              rangeAnnotations: RangeAnnotations(
-                horizontalRangeAnnotations: horizontalRanges,
-                verticalRangeAnnotations: verticalRanges,
-              ),
-              extraLinesData: ExtraLinesData(
-                horizontalLines: horizontalLines,
-                verticalLines: peakVerticalLines,
-              ),
-              titlesData: FlTitlesData(
-                topTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                rightTitles: const AxisTitles(
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                leftTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 34,
-                    interval: yInterval,
-                    getTitlesWidget: (val, meta) {
-                      if (val == minY || val == maxY) {
-                        return const SizedBox.shrink();
-                      }
-                      return Text(
-                        val.round().toString(),
+                if (hasNotes)
+                  Positioned(
+                    left: 8,
+                    bottom: laneHeight + 8,
+                    child: IgnorePointer(
+                      child: Text(
+                        'Pin catatan kejadian pada grafik',
                         style: GoogleFonts.inter(
-                          fontSize: 10,
-                          color: const Color(0xFF6F7B74),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 24,
-                    interval: xInterval,
-                    getTitlesWidget: (val, meta) {
-                      final ms = firstMs + (val * 60000).round();
-                      final wib = DateTime.fromMillisecondsSinceEpoch(
-                        ms,
-                        isUtc: true,
-                      ).add(const Duration(hours: 7));
-                      final label =
-                          '${wib.hour.toString().padLeft(2, '0')}:${wib.minute.toString().padLeft(2, '0')}';
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: Text(
-                          label,
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            color: const Color(0xFF6F7B74),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-              lineTouchData: LineTouchData(
-                enabled: true,
-                touchTooltipData: LineTouchTooltipData(
-                  tooltipBgColor: const Color(0xFF1E2A24),
-                  getTooltipItems: (touchedSpots) {
-                    return touchedSpots.map((spot) {
-                      final ms = firstMs + (spot.x * 60000).round();
-                      final wib = DateTime.fromMillisecondsSinceEpoch(
-                        ms,
-                        isUtc: true,
-                      ).add(const Duration(hours: 7));
-                      final timeStr =
-                          '${wib.hour.toString().padLeft(2, '0')}:${wib.minute.toString().padLeft(2, '0')}';
-                      final key =
-                          '${spot.x.toStringAsFixed(3)}_${spot.y.round()}';
-                      final isPeak = peakSpotKeys.contains(key);
-                      final prefix = isPeak ? 'Puncak Episode · ' : '';
-                      return LineTooltipItem(
-                        '$prefix$timeStr\n${spot.y.round()} BPM',
-                        GoogleFonts.inter(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                          color: const Color(0xFF1E2A24),
                         ),
-                      );
-                    }).toList();
-                  },
-                ),
-              ),
-              lineBarsData: [
-                LineChartBarData(
-                  spots: spots,
-                  isCurved: false,
-                  color: const Color(0xFF1F5C4A),
-                  barWidth: 2.2,
-                  dotData: FlDotData(
-                    show: true,
-                    getDotPainter: (spot, percent, barData, index) {
-                      final key =
-                          '${spot.x.toStringAsFixed(3)}_${spot.y.round()}';
-                      if (peakSpotKeys.contains(key)) {
-                        return FlDotCirclePainter(
-                          radius: 5.0,
-                          color: const Color(0xFFE8A24F),
-                          strokeWidth: 2.0,
-                          strokeColor: Colors.white,
-                        );
-                      }
-                      final showRegularDot = parsedPoints.length <= 80;
-                      return FlDotCirclePainter(
-                        radius: showRegularDot ? 2.5 : 0.0,
-                        color: const Color(0xFF1F5C4A),
-                        strokeWidth: 0,
-                        strokeColor: Colors.transparent,
-                      );
-                    },
+                      ),
+                    ),
                   ),
-                ),
+                if (_showJumpToNow)
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: TextButton(
+                      key: const Key('chart_jump_to_now'),
+                      onPressed: () {
+                        if (!_scrollController.hasClients) return;
+                        _scrollController.animateTo(
+                          _scrollController.position.maxScrollExtent,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOut,
+                        );
+                      },
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.white.withValues(alpha: 0.92),
+                        foregroundColor: const Color(0xFF1F5C4A),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        side: const BorderSide(color: Color(0xFFD9DED6)),
+                      ),
+                      child: Text(
+                        'Ke sekarang',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
         ),
-        if (analysis.notes.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _buildActivityPinsTimeline(
-            notes: analysis.notes,
-            firstMs: firstMs,
-            lastMs: lastMs,
-          ),
-        ],
       ],
     );
   }
 
-  Widget _buildActivityPinsTimeline({
-    required List<AnalysisNote> notes,
-    required int firstMs,
-    required int lastMs,
-  }) {
-    final totalSpanMs = math.max(1, lastMs - firstMs);
-    final positionedNotes = <({AnalysisNote note, double ratio, int row})>[];
-    final lastRatioPerRow = <int, double>{};
+  ({Color color, double radius}) _dotStyle(
+    double bpm,
+    bool sufficient,
+    double? p75,
+    int margin,
+  ) {
+    if (!sufficient || p75 == null) {
+      return (color: _colorNeutral, radius: 3.5);
+    }
+    final p25 = _analysis?.baseline.p25;
+    if (p25 != null && bpm < p25) return (color: _colorBelow, radius: 3);
+    if (bpm <= p75) return (color: _colorNormal, radius: 3);
+    if (bpm <= p75 + margin) return (color: _colorAbove, radius: 4.5);
+    return (color: _colorEpisode, radius: 6);
+  }
 
-    for (final note in notes) {
-      final ms = DateTime.tryParse(note.at)?.millisecondsSinceEpoch;
-      final ratio = ms != null
-          ? ((ms - firstMs) / totalSpanMs).clamp(0.0, 1.0)
-          : 0.5;
+  Widget _buildSelectedPanel(
+    AnalysisModel analysis,
+    _ChartGeometry g,
+    bool sufficient,
+    int episodeMargin,
+  ) {
+    _Pt? pt;
+    for (final p in g.points) {
+      if (p.ms == _selectedMs) pt = p;
+    }
+    if (pt == null) return const SizedBox.shrink();
 
-      int assignedRow = 0;
-      if (lastRatioPerRow.containsKey(0) &&
-          (ratio - lastRatioPerRow[0]!).abs() < 0.18) {
-        assignedRow = 1;
+    final baseline = analysis.baseline;
+    final bpm = pt.bpm.round();
+    final bool minuteOnly = analysis.resolutionSeconds >= 60;
+    final clock = _clockFromRaw(pt.rawT, withSeconds: !minuteOnly);
+    final status = _statusLabel(
+      bpm: bpm,
+      sufficient: sufficient,
+      p25: baseline.p25,
+      p75: baseline.p75,
+      margin: episodeMargin,
+    );
+
+    String? episodeText;
+    for (final ep in analysis.episodes) {
+      final s = DateTime.tryParse(ep.start)?.millisecondsSinceEpoch;
+      final e = DateTime.tryParse(ep.end)?.millisecondsSinceEpoch;
+      if (s == null || e == null) continue;
+      if (pt.ms >= s && pt.ms <= e) {
+        final median = baseline.median;
+        final diff = median != null ? (pt.bpm - median).round() : null;
+        episodeText = (diff != null && diff > 0)
+            ? 'Bagian dari episode ${ep.index} (+$diff di atas median)'
+            : 'Bagian dari episode ${ep.index}';
+        break;
       }
-      lastRatioPerRow[assignedRow] = ratio;
-      positionedNotes.add((note: note, ratio: ratio, row: assignedRow));
     }
 
-    final hasSecondRow = positionedNotes.any((p) => p.row == 1);
-
     return Container(
-      padding: const EdgeInsets.all(12),
+      key: const Key('chart_detail_panel'),
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
       decoration: BoxDecoration(
         color: const Color(0xFFF6F4EF),
         borderRadius: BorderRadius.circular(14),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Pin catatan kejadian pada grafik',
-            style: GoogleFonts.inter(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF1E2A24),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$clock · $bpm bpm',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF1E2A24),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  status,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: const Color(0xFF6F7B74),
+                  ),
+                ),
+                if (episodeText != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    episodeText,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: const Color(0xFFB45309),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-          const SizedBox(height: 8),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final width = constraints.maxWidth;
-              return SizedBox(
-                height: hasSecondRow ? 54 : 28,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: positionedNotes.map((item) {
-                    final label =
-                        '${formatTimeWib(item.note.at)} · ${getEventTypeName(item.note.type)}';
-                    final double left = (item.ratio * (width - 110))
-                        .clamp(0.0, math.max(0.0, width - 110))
-                        .toDouble();
-                    return Positioned(
-                      left: left,
-                      top: item.row * 26.0,
-                      child: Container(
-                        constraints: BoxConstraints(
-                          maxWidth: math.min(150.0, width),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFD9DED6)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              getEventTypeIcon(item.note.type),
-                              size: 12,
-                              color: const Color(0xFF1F5C4A),
-                            ),
-                            const SizedBox(width: 4),
-                            Flexible(
-                              child: Text(
-                                label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.inter(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFF1E2A24),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              );
-            },
+          TextButton(
+            onPressed: () => setState(() => _selectedMs = null),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF1F5C4A),
+              minimumSize: Size.zero,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              'Tutup',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -616,8 +918,10 @@ class HomeMonitoringChartCard extends StatelessWidget {
   }
 
   Widget _buildHourlyFallbackBars() {
-    final p75 = (baselineData != null && baselineData!['sufficient'] == true)
-        ? (baselineData!['p75'] as num?)?.toDouble()
+    final p75 =
+        (widget.baselineData != null &&
+            widget.baselineData!['sufficient'] == true)
+        ? (widget.baselineData!['p75'] as num?)?.toDouble()
         : null;
 
     return SizedBox(
@@ -625,7 +929,7 @@ class HomeMonitoringChartCard extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         crossAxisAlignment: CrossAxisAlignment.end,
-        children: hourlyAverages.map((item) {
+        children: widget.hourlyAverages.map((item) {
           final avg = (item['avg'] as num).toDouble();
           final label = item['label'].toString();
 
@@ -710,3 +1014,110 @@ class HomeMonitoringChartCard extends StatelessWidget {
   }
 }
 
+class _PlotBackgroundPainter extends CustomPainter {
+  final _ChartGeometry g;
+  final List<double> yTicks;
+  final double? bandP25;
+  final double? bandP75;
+  final double? median;
+  final List<(double, double)> gapRects;
+
+  _PlotBackgroundPainter({
+    required this.g,
+    required this.yTicks,
+    required this.bandP25,
+    required this.bandP75,
+    required this.median,
+    required this.gapRects,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (bandP25 != null && bandP75 != null) {
+      final top = g.yPx(bandP75!);
+      final bottom = g.yPx(bandP25!);
+      canvas.drawRect(
+        Rect.fromLTRB(0, top, size.width, bottom),
+        Paint()..color = const Color(0xFFE3EEDF).withValues(alpha: 0.8),
+      );
+    }
+
+    final gridPaint = Paint()
+      ..color = const Color(0xFFF1F5F9)
+      ..strokeWidth = 1;
+    for (final v in yTicks) {
+      final y = g.yPx(v);
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+
+    for (final r in gapRects) {
+      final left = math.min(r.$1, r.$2);
+      final right = math.max(math.max(r.$1, r.$2), left + 6);
+      final rect = Rect.fromLTRB(left, 0, right, size.height);
+      canvas.save();
+      canvas.clipRect(rect);
+      canvas.drawRect(
+        rect,
+        Paint()..color = const Color(0xFF94A3B8).withValues(alpha: 0.10),
+      );
+      final hatch = Paint()
+        ..color = const Color(0xFF94A3B8).withValues(alpha: 0.55)
+        ..strokeWidth = 1;
+      for (double x = left - size.height; x < right; x += 7) {
+        canvas.drawLine(
+          Offset(x, size.height),
+          Offset(x + size.height, 0),
+          hatch,
+        );
+      }
+      canvas.restore();
+    }
+
+    if (median != null) {
+      final y = g.yPx(median!);
+      final paint = Paint()
+        ..color = const Color(0xFF1F5C4A).withValues(alpha: 0.35)
+        ..strokeWidth = 1;
+      for (double x = 0; x < size.width; x += 8) {
+        canvas.drawLine(
+          Offset(x, y),
+          Offset(math.min(x + 4, size.width), y),
+          paint,
+        );
+      }
+    }
+
+    final axisPaint = Paint()
+      ..color = const Color(0xFFE2E8F0)
+      ..strokeWidth = 1;
+    canvas.drawLine(
+      Offset(0, size.height),
+      Offset(size.width, size.height),
+      axisPaint,
+    );
+    canvas.drawLine(const Offset(0, 0), Offset(0, size.height), axisPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _PlotBackgroundPainter old) => true;
+}
+
+class _RingPainter extends CustomPainter {
+  final Offset center;
+  _RingPainter(this.center);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawCircle(
+      center,
+      11,
+      Paint()
+        ..color = const Color(0xFF1E2A24)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _RingPainter old) => old.center != center;
+}

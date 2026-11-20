@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
+import '../widgets/siband_logo.dart';
 import 'login_screen.dart';
 import 'main_navigation_screen.dart';
 
@@ -83,22 +84,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  void _handleGoogleSignIn() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Masuk dengan Google belum tersedia'),
-      ),
-    );
-  }
-
-  Widget _buildGoogleIcon() {
-    return const Icon(
-      Icons.g_mobiledata_rounded,
-      size: 32,
-      color: Color(0xFF4285F4),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -122,8 +107,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // Blok konten mulai ±12% tinggi layar (judul)
-                          SizedBox(height: height * 0.12),
+                          SizedBox(height: height * 0.06),
+                          // Sementara, ganti dengan logo dari desain tim.
+                          const Center(child: SibandLogo(size: 52)),
+                          const SizedBox(height: 14),
 
                           // Judul
                           Text(
@@ -528,50 +515,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                           const SizedBox(height: 12),
 
-                          // Tombol Google
-                          Semantics(
-                            label: 'Masuk dengan Google',
-                            button: true,
-                            child: Container(
-                              height: 46,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.06),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(12),
-                                  onTap: _handleGoogleSignIn,
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      _buildGoogleIcon(),
-                                      const SizedBox(width: 8),
-                                      Flexible(
-                                        child: Text(
-                                          'Masuk dengan Google',
-                                          overflow: TextOverflow.ellipsis,
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.w500,
-                                            color: const Color(0xFF111111),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
 
                           const Spacer(),
 

@@ -198,11 +198,12 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.byType(MainNavigationScreen), findsOneWidget);
-      expect(find.text('Beranda'), findsOneWidget);
-      expect(find.text('Panduan'), findsOneWidget);
-      expect(find.text('Rekap'), findsOneWidget);
-      expect(find.text('GPS'), findsOneWidget);
-      expect(find.text('Profil'), findsOneWidget);
+      final navBar = find.byKey(const Key('main_bottom_nav_bar'));
+      expect(find.descendant(of: navBar, matching: find.text('Beranda')), findsOneWidget);
+      expect(find.descendant(of: navBar, matching: find.text('Panduan')), findsOneWidget);
+      expect(find.descendant(of: navBar, matching: find.text('Rekap')), findsOneWidget);
+      expect(find.descendant(of: navBar, matching: find.text('GPS')), findsNothing);
+      expect(find.descendant(of: navBar, matching: find.text('Profil')), findsOneWidget);
     });
 
     testWidgets('Renders MainNavigationScreen without overflow on 412x915', (tester) async {
@@ -221,23 +222,20 @@ void main() {
       await tester.pumpWidget(buildTestable(MainNavigationScreen(initialChildren: mockChildren)));
       await tester.pumpAndSettle();
 
+      final navBar = find.byKey(const Key('main_bottom_nav_bar'));
+
       // Tap Panduan
-      await tester.tap(find.text('Panduan'));
+      await tester.tap(find.descendant(of: navBar, matching: find.text('Panduan')));
       await tester.pumpAndSettle();
       expect(find.text('Panduan menenangkan'), findsOneWidget);
 
       // Tap Rekap
-      await tester.tap(find.text('Rekap'));
+      await tester.tap(find.descendant(of: navBar, matching: find.text('Rekap')));
       await tester.pumpAndSettle();
       expect(find.text('Riwayat & Rekap'), findsOneWidget);
 
-      // Tap GPS
-      await tester.tap(find.text('GPS'));
-      await tester.pumpAndSettle();
-      expect(find.text('Lokasi anak'), findsOneWidget);
-
       // Tap Profil
-      await tester.tap(find.text('Profil'));
+      await tester.tap(find.descendant(of: navBar, matching: find.text('Profil')));
       await tester.pumpAndSettle();
       expect(find.text('Preferensi pendampingan'), findsOneWidget);
       expect(find.text('Jurnal harian & pengaturan privasi'), findsOneWidget);
@@ -247,7 +245,7 @@ void main() {
       expect(find.text('Keluar'), findsOneWidget);
 
       // Return to Beranda
-      await tester.tap(find.text('Beranda'));
+      await tester.tap(find.descendant(of: navBar, matching: find.text('Beranda')));
       await tester.pumpAndSettle();
     });
 
@@ -259,12 +257,13 @@ void main() {
 
       expect(tester.takeException(), isNull);
 
-      // Greeting
-      expect(find.textContaining('Bunda'), findsOneWidget);
+      // Header child chip
       expect(find.textContaining('Bima'), findsAtLeastNWidgets(1));
 
-      // Banner text
-      expect(find.text('Yuk Memahami Anak'), findsOneWidget);
+      // Shortcut row (menggantikan banner lama)
+      expect(find.text('Yuk Memahami Anak'), findsNothing);
+      expect(find.byKey(const Key('home_shortcut_panduan')), findsOneWidget);
+      expect(find.byKey(const Key('home_shortcut_rekap')), findsOneWidget);
 
       // Check monitoring elements
       expect(find.text('PEMANTAUAN DETAK JANTUNG'), findsOneWidget);
@@ -277,7 +276,7 @@ void main() {
 
       // Event note button & warning text
       expect(find.text('+ Catatan kejadian'), findsOneWidget);
-      expect(find.text('Perubahan detak jantung bukan bukti stres.'), findsOneWidget);
+      expect(find.text('Detak jantung naik bisa dipicu banyak hal.'), findsOneWidget);
     });
 
     testWidgets('HomeScreen displays Tambah anak when no children exist', (tester) async {
@@ -288,19 +287,18 @@ void main() {
       expect(find.text('Tambah Anak'), findsOneWidget);
     });
 
-    testWidgets('Tapping notification icon shows SnackBar', (tester) async {
+    testWidgets('Tapping watch status chip opens Status jam bottom sheet', (tester) async {
       await tester.pumpWidget(buildTestable(HomeScreen(initialChildren: mockChildren)));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.bySemanticsLabel('Notifikasi'));
-      await tester.pump();
-
-      expect(find.text('Notifikasi belum tersedia'), findsOneWidget);
-      await tester.pump(const Duration(seconds: 4));
+      await tester.tap(find.byKey(const Key('watch_status_chip')));
       await tester.pumpAndSettle();
+
+      expect(find.text('Status jam'), findsOneWidget);
+      expect(find.text('Pasang atau ganti jam'), findsOneWidget);
     });
 
-    testWidgets('Banner tap triggers navigation to Panduan', (tester) async {
+    testWidgets('Shortcut Panduan tap triggers navigation to Panduan', (tester) async {
       bool navigated = false;
       await tester.pumpWidget(buildTestable(HomeScreen(
         initialChildren: mockChildren,
@@ -310,7 +308,10 @@ void main() {
       )));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Yuk Memahami Anak'));
+      final shortcut = find.byKey(const Key('home_shortcut_panduan'));
+      await tester.ensureVisible(shortcut);
+      await tester.pumpAndSettle();
+      await tester.tap(shortcut);
       await tester.pumpAndSettle();
 
       expect(navigated, isTrue);
@@ -394,11 +395,12 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.textContaining('Anak Demo'), findsAtLeastNWidgets(1));
       expect(find.text('PEMANTAUAN DETAK JANTUNG'), findsOneWidget);
-      expect(find.text('Beranda'), findsOneWidget);
-      expect(find.text('Panduan'), findsOneWidget);
-      expect(find.text('Rekap'), findsOneWidget);
-      expect(find.text('GPS'), findsOneWidget);
-      expect(find.text('Profil'), findsOneWidget);
+      final navBar = find.byKey(const Key('main_bottom_nav_bar'));
+      expect(find.descendant(of: navBar, matching: find.text('Beranda')), findsOneWidget);
+      expect(find.descendant(of: navBar, matching: find.text('Panduan')), findsOneWidget);
+      expect(find.descendant(of: navBar, matching: find.text('Rekap')), findsOneWidget);
+      expect(find.descendant(of: navBar, matching: find.text('GPS')), findsNothing);
+      expect(find.descendant(of: navBar, matching: find.text('Profil')), findsOneWidget);
     });
 
     testWidgets('Layar utama dengan data tiruan Anak Demo memverifikasi nama anak, PEMANTAUAN DETAK JANTUNG, dan bar navigasi di 412x915', (tester) async {
@@ -415,11 +417,12 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.textContaining('Anak Demo'), findsAtLeastNWidgets(1));
       expect(find.text('PEMANTAUAN DETAK JANTUNG'), findsOneWidget);
-      expect(find.text('Beranda'), findsOneWidget);
-      expect(find.text('Panduan'), findsOneWidget);
-      expect(find.text('Rekap'), findsOneWidget);
-      expect(find.text('GPS'), findsOneWidget);
-      expect(find.text('Profil'), findsOneWidget);
+      final navBar = find.byKey(const Key('main_bottom_nav_bar'));
+      expect(find.descendant(of: navBar, matching: find.text('Beranda')), findsOneWidget);
+      expect(find.descendant(of: navBar, matching: find.text('Panduan')), findsOneWidget);
+      expect(find.descendant(of: navBar, matching: find.text('Rekap')), findsOneWidget);
+      expect(find.descendant(of: navBar, matching: find.text('GPS')), findsNothing);
+      expect(find.descendant(of: navBar, matching: find.text('Profil')), findsOneWidget);
     });
 
     testWidgets('Layar utama dalam kondisi error menampilkan pesan error dan tombol Coba lagi di 360x640', (tester) async {
@@ -442,7 +445,7 @@ void main() {
       expect(find.text('Beranda'), findsOneWidget);
       expect(find.text('Panduan'), findsOneWidget);
       expect(find.text('Rekap'), findsOneWidget);
-      expect(find.text('GPS'), findsOneWidget);
+      expect(find.text('GPS'), findsNothing);
       expect(find.text('Profil'), findsOneWidget);
     });
 
@@ -553,7 +556,7 @@ void main() {
           await tester.pumpWidget(
             buildTestable(
               MainNavigationScreen(
-                initialIndex: 4,
+                initialIndex: 3,
                 initialChildren: mockChildren,
                 onFetchChildren: () async => mockChildren,
               ),
@@ -655,15 +658,25 @@ void main() {
         await tester.tap(find.byIcon(Icons.arrow_back_rounded));
         await tester.pumpAndSettle();
 
-        // 2. Pengingat jurnal & zona aman
+        // 2. Pengingat jurnal & zona aman: baris nonaktif, tanpa SnackBar
         await tester.ensureVisible(find.text('Pengingat jurnal & zona aman'));
         await tester.pumpAndSettle();
+        expect(find.text('Segera hadir'), findsOneWidget);
+        final semanticsHandle = tester.ensureSemantics();
+        expect(find.bySemanticsLabel('Segera hadir, belum aktif'), findsOneWidget);
+        semanticsHandle.dispose();
+        final disabledOpacity = tester.widget<Opacity>(
+          find.ancestor(
+            of: find.text('Pengingat jurnal & zona aman'),
+            matching: find.byType(Opacity),
+          ).first,
+        );
+        expect(disabledOpacity.opacity, 0.5);
         await tester.tap(find.text('Pengingat jurnal & zona aman'));
-        await tester.pumpAndSettle();
-        expect(find.text('Segera hadir'), findsAtLeastNWidgets(1));
-        expect(find.text('Pengingat dan zona aman belum tersedia pada prototipe.'), findsOneWidget);
-        await tester.pageBack();
-        await tester.pumpAndSettle();
+        await tester.pump();
+        expect(find.byType(SnackBar), findsNothing);
+        expect(find.text('Pengingat dan zona aman belum tersedia pada prototipe.'), findsNothing);
+        expect(find.byType(ProfileScreen), findsOneWidget);
 
         // 3. Bantuan dan dukungan
         await tester.ensureVisible(find.text('Bantuan dan dukungan'));
@@ -1020,7 +1033,7 @@ void main() {
     );
   });
 
-  group('LocationScreen (GPS Tab) Tests', () {
+  group('LocationScreen Tests', () {
     const gpsTestSizes = [
       Size(360, 640),
       Size(412, 915),
@@ -1029,7 +1042,7 @@ void main() {
 
     for (final size in gpsTestSizes) {
       testWidgets(
-        'Tab GPS tata letak di ${size.width.toInt()}x${size.height.toInt()}: bar bawah menempel & <=96, tombol Perbarui Lokasi terlihat setelah scroll',
+        'LocationScreen tata letak di ${size.width.toInt()}x${size.height.toInt()}: tombol Perbarui Lokasi terlihat setelah scroll',
         (tester) async {
           tester.view.physicalSize = size;
           tester.view.devicePixelRatio = 1.0;
@@ -1043,30 +1056,14 @@ void main() {
 
           await tester.pumpWidget(
             buildTestable(
-              MainNavigationScreen(
-                initialIndex: 3,
-                initialChildren: mockChildren,
-                onFetchChildren: () async => mockChildren,
-              ),
+              const LocationScreen(),
               size: size,
             ),
           );
           await tester.pumpAndSettle();
 
           expect(tester.takeException(), isNull);
-
-          final mainScaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
-          expect(mainScaffold.bottomNavigationBar, isNotNull);
-          final bottomNavFinder = find.byWidget(mainScaffold.bottomNavigationBar!);
-          final bottomNavRect = tester.getRect(bottomNavFinder);
-
-          expect(bottomNavRect.height, lessThanOrEqualTo(96.0));
-          expect(bottomNavRect.bottom, equals(size.height));
-
-          final bodyFinder = find.byType(IndexedStack);
-          final bodyRect = tester.getRect(bodyFinder);
-          expect(bodyRect.height, greaterThan(0));
-          expect(bodyRect.bottom, lessThanOrEqualTo(bottomNavRect.top));
+          expect(find.text('Lokasi anak'), findsOneWidget);
 
           // Pastikan tombol Perbarui Lokasi terlihat di dalam layar setelah scroll bila perlu
           final updateBtnFinder = find.widgetWithText(ElevatedButton, 'Perbarui Lokasi');
@@ -1075,7 +1072,7 @@ void main() {
           await tester.pumpAndSettle();
           final updateRect = tester.getRect(updateBtnFinder);
           expect(updateRect.top, greaterThanOrEqualTo(0));
-          expect(updateRect.bottom, lessThanOrEqualTo(bottomNavRect.top));
+          expect(updateRect.bottom, lessThanOrEqualTo(size.height));
         },
       );
     }
@@ -1123,14 +1120,15 @@ void main() {
     );
 
     testWidgets(
-      'Tombol kembali kiri atas pada tab GPS berpindah ke tab Beranda',
+      'Tombol kembali kiri atas pada LocationScreen memanggil callback onBackToHome',
       (tester) async {
+        bool backCalled = false;
         await tester.pumpWidget(
           buildTestable(
-            MainNavigationScreen(
-              initialIndex: 3,
-              initialChildren: mockChildren,
-              onFetchChildren: () async => mockChildren,
+            LocationScreen(
+              onBackToHome: () {
+                backCalled = true;
+              },
             ),
           ),
         );
@@ -1147,7 +1145,7 @@ void main() {
         await tester.tap(backBtnFinder);
         await tester.pumpAndSettle();
 
-        expect(find.text('PEMANTAUAN DETAK JANTUNG'), findsOneWidget);
+        expect(backCalled, isTrue);
       },
     );
   });

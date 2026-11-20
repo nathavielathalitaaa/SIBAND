@@ -437,7 +437,7 @@ void main() {
     });
 
     testWidgets(
-      'Menampilkan BPM terkini, baseline p25-p75, grafik LineChart, pin catatan, dan ringkasan episode ringkas tanpa overflow di 360x640',
+      'Menampilkan BPM terkini, baseline p25-p75, grafik ScatterChart, pin catatan, dan ringkasan episode ringkas tanpa overflow di 360x640',
       (tester) async {
         tester.view.physicalSize = const Size(360, 640);
         tester.view.devicePixelRatio = 1.0;
@@ -480,10 +480,10 @@ void main() {
         expect(find.text('70–90 BPM'), findsOneWidget);
         expect(find.text('80 BPM'), findsOneWidget);
         expect(find.text('120 sampel'), findsOneWidget);
-        expect(find.text('Sensor aktif mengukur'), findsOneWidget);
+        expect(find.text('Jam sedang mengukur'), findsOneWidget);
 
-        // 2. Grafik Pemantauan Time-Series (fl_chart LineChart), Pin Catatan, & Footer Time-Series
-        expect(find.byType(LineChart), findsOneWidget);
+        // 2. Grafik Pemantauan Time-Series (fl_chart ScatterChart), Pin Catatan, & Footer Time-Series
+        expect(find.byType(ScatterChart), findsOneWidget);
         expect(find.text('Pin catatan kejadian pada grafik'), findsOneWidget);
         expect(
           find.text('Pemantauan rentang waktu · bukan diagnosis'),
@@ -635,7 +635,7 @@ void main() {
         expect(find.text('--'), findsOneWidget);
         expect(find.text('Jam · terputus'), findsOneWidget);
         expect(find.text('Data tidak terbaru'), findsOneWidget);
-        expect(find.text('Sensor terputus · data kedaluwarsa'), findsOneWidget);
+        expect(find.text('Jam tidak terhubung'), findsOneWidget);
       },
     );
 
