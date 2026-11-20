@@ -5,12 +5,11 @@ import '../models/child_model.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/heart_rate_service.dart';
-import 'bpm_dashboard_screen.dart' hide Mode, HrSensorStatus;
+import 'device_setup_screen.dart';
 import 'help_screen.dart';
 import 'journal_privacy_screen.dart';
 import 'manage_children_screen.dart';
 import 'onboarding_screen.dart';
-import 'pair_device_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback? onChildrenChanged;
@@ -313,248 +312,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Future<void> _handleDataSourceSelection() async {
-    final currentMode = _hrService.currentMode;
-    final selectedMode = await showDialog<Mode>(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text(
-            'Pilih Sumber Data',
-            style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 18),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                tileColor: currentMode == Mode.dummy ? const Color(0xFFE3EEDF) : null,
-                leading: Icon(
-                  Icons.bolt_rounded,
-                  color: currentMode == Mode.dummy ? const Color(0xFF1F5C4A) : const Color(0xFF6F7B74),
-                ),
-                title: Text(
-                  'Mode Dummy',
-                  style: GoogleFonts.inter(
-                    fontSize: 15,
-                    fontWeight: currentMode == Mode.dummy ? FontWeight.w600 : FontWeight.w400,
-                  ),
-                ),
-                subtitle: Text(
-                  'Data simulasi acak',
-                  style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600),
-                ),
-                trailing: currentMode == Mode.dummy
-                    ? const Icon(Icons.check_circle_rounded, color: Color(0xFF1F5C4A))
-                    : null,
-                onTap: () => Navigator.pop(ctx, Mode.dummy),
-              ),
-              const SizedBox(height: 8),
-              ListTile(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                tileColor: currentMode == Mode.ble ? const Color(0xFFE3EEDF) : null,
-                leading: Icon(
-                  Icons.bluetooth_rounded,
-                  color: currentMode == Mode.ble ? const Color(0xFF1F5C4A) : const Color(0xFF6F7B74),
-                ),
-                title: Text(
-                  'BLE Asli (Smartband)',
-                  style: GoogleFonts.inter(
-                    fontSize: 15,
-                    fontWeight: currentMode == Mode.ble ? FontWeight.w600 : FontWeight.w400,
-                  ),
-                ),
-                subtitle: Text(
-                  'Hubungkan ke jam lewat Bluetooth',
-                  style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600),
-                ),
-                trailing: currentMode == Mode.ble
-                    ? const Icon(Icons.check_circle_rounded, color: Color(0xFF1F5C4A))
-                    : null,
-                onTap: () => Navigator.pop(ctx, Mode.ble),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-
-    if (selectedMode == null || !mounted) return;
-
-    if (selectedMode == Mode.dummy) {
-      _hrService.switchMode(Mode.dummy);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Beralih ke Mode Dummy'),
-            backgroundColor: Color(0xFF1F5C4A),
-          ),
-        );
-        setState(() {});
-      }
-    } else {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const PairDeviceScreen(),
-        ),
-      );
-      if (mounted) setState(() {});
-    }
-  }
-
   Future<void> _openDeviceAndDataSourceSheet() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DeviceSetupScreen(
+          activeChild: _activeChild,
+        ),
       ),
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (sheetCtx, setSheetState) {
-            return SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Perangkat & sumber data',
-                      style: GoogleFonts.inter(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF1E2A24),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE3EEDF),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.sensors_rounded, color: Color(0xFF1F5C4A), size: 20),
-                      ),
-                      title: Text(
-                        'Sumber data',
-                        style: GoogleFonts.inter(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                          color: const Color(0xFF1E2A24),
-                        ),
-                      ),
-                      subtitle: Text(
-                        _hrService.currentMode == Mode.dummy ? 'Mode Dummy' : 'BLE Asli',
-                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF6F7B74)),
-                      ),
-                      trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF6F7B74)),
-                      onTap: () async {
-                        await _handleDataSourceSelection();
-                        if (sheetCtx.mounted) setSheetState(() {});
-                        if (mounted) setState(() {});
-                      },
-                    ),
-                    const Divider(height: 1),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE3EEDF),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.watch_rounded, color: Color(0xFF1F5C4A), size: 20),
-                      ),
-                      title: Text(
-                        'Pasang jam',
-                        style: GoogleFonts.inter(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                          color: const Color(0xFF1E2A24),
-                        ),
-                      ),
-                      subtitle: Text(
-                        _hrService.pairedDeviceName != null
-                            ? _hrService.pairedDeviceName!
-                            : 'Belum ada jam terpasang',
-                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF6F7B74)),
-                      ),
-                      trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF6F7B74)),
-                      onTap: () async {
-                        Navigator.pop(ctx);
-                        if (!mounted) return;
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => PairDeviceScreen(
-                              childId: _activeChild?.id,
-                              childNickname: _activeChild?.nickname,
-                            ),
-                          ),
-                        );
-                        if (mounted) setState(() {});
-                      },
-                    ),
-                    const Divider(height: 1),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE3EEDF),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.developer_board_rounded, color: Color(0xFF1F5C4A), size: 20),
-                      ),
-                      title: Text(
-                        'Layar teknis (lama)',
-                        style: GoogleFonts.inter(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                          color: const Color(0xFF1E2A24),
-                        ),
-                      ),
-                      subtitle: Text(
-                        'BpmDashboardScreen lama untuk pengujian BLE langsung',
-                        style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF6F7B74)),
-                      ),
-                      trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF6F7B74)),
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        if (!mounted) return;
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const BpmDashboardScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
     );
+    if (mounted) setState(() {});
   }
 
   Widget _buildPreferenceCard({
