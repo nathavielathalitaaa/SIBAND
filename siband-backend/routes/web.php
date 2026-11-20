@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return response()->file(public_path('download.html'));
+    return response()->file(public_path('landing.html'));
 });
 
 Route::get('/share', function () {

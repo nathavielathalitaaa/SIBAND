@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Siband — Pendamping Pemantauan Detak Jantung &amp; Catatan Harian Anak</title>
+  <style>
+    :root {
+      --green: #1F5C4A;
+      --green-deep: #174638;
+      --green-soft: #E3EEDF;
+      --sand: #F6F4EF;
+      --card: rgba(217, 222, 214, 0.30);
+      --amber: #E8A24F;
+      --amber-soft: rgba(232, 162, 79, 0.16);
+      --grey: #D9DED6;
+      --text: #1E2A24;
+      --muted: #6F7B74;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--sand);
+      color: var(--text);
+      line-height: 1.55;
+    }
+    a { color: inherit; }
+
+    .container {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    /* Top Nav */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(246, 244, 239, 0.92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid rgba(217, 222, 214, 0.7);
+    }
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      height: 64px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--text);
+    }
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: var(--green-soft);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .nav-link {
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--muted);
+      padding: 8px 12px;
+      border-radius: 999px;
+    }
+    .nav-link:hover { color: var(--green); background: var(--green-soft); }
+    .nav-cta {
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: #fff;
+      background: var(--green);
+      padding: 9px 15px;
+      border-radius: 999px;
+    }
+
+    /* Hero */
+    .hero-section {
+      padding: 36px 0 24px;
+    }
+    .hero-card {
+      background: linear-gradient(135deg, var(--green), var(--green-deep));
+      color: #fff;
+      border-radius: 28px;
+      padding: 36px 28px;
+      box-shadow: 0 14px 32px rgba(31, 92, 74, 0.18);
+      display: grid;
+      grid-template-columns: 1.25fr 0.75fr;
+      gap: 28px;
+      align-items: center;
+    }
+    .eyebrow {
+      display: inline-block;
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: rgba(255, 255, 255, 0.14);
+      padding: 6px 12px;
+      border-radius: 999px;
+      margin-bottom: 14px;
+    }
+    .hero-card h1 {
+      margin: 0 0 12px;
+      font-size: clamp(24px, 4vw, 36px);
+      line-height: 1.2;
+      font-weight: 700;
+    }
+    .hero-card p {
+      margin: 0 0 22px;
+      font-size: 15px;
+      color: rgba(255, 255, 255, 0.88);
+      max-width: 52ch;
+    }
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .btn-light {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-decoration: none;
+      background: var(--green-soft);
+      color: var(--green);
+      font-weight: 700;
+      font-size: 14.5px;
+      padding: 13px 20px;
+      border-radius: 14px;
+    }
+    .btn-ghost {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-decoration: none;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      color: #fff;
+      font-weight: 600;
+      font-size: 14.5px;
+      padding: 13px 20px;
+      border-radius: 14px;
+    }
+    .hero-visual {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 22px;
+      padding: 20px;
+      text-align: center;
+    }
+    .hero-visual-badge {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.8);
+      margin-bottom: 10px;
+    }
+    .hero-metric {
+      font-size: 40px;
+      font-weight: 800;
+      line-height: 1.1;
+      margin: 4px 0;
+    }
+    .hero-metric span {
+      font-size: 15px;
+      font-weight: 600;
+      opacity: 0.8;
+    }
+    .hero-pill {
+      display: inline-block;
+      margin-top: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      background: rgba(232, 162, 79, 0.22);
+      color: #fff;
+      padding: 5px 12px;
+      border-radius: 999px;
+    }
+
+    /* Sections */
+    section {
+      padding: 24px 0;
+    }
+    .section-title {
+      margin: 0 0 6px;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .section-sub {
+      margin: 0 0 18px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    /* 3-Step Flow */
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+    .step-card {
+      background: var(--card);
+      border-radius: 20px;
+      padding: 20px;
+    }
+    .step-num {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--green-soft);
+      color: var(--green);
+      font-weight: 700;
+      font-size: 14px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 12px;
+    }
+    .step-card h3 {
+      margin: 0 0 6px;
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .step-card p {
+      margin: 0;
+      font-size: 13.5px;
+      color: var(--muted);
+    }
+
+    /* Two-column main hub: Download APK (with QR) + Therapist Access */
+    .hub-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+    .hub-card {
+      background: var(--card);
+      border-radius: 24px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .hub-card.soft-green {
+      background: var(--green-soft);
+    }
+    .tag {
+      display: inline-block;
+      width: fit-content;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--green);
+      background: var(--green-soft);
+      padding: 4px 10px;
+      border-radius: 999px;
+      margin-bottom: 10px;
+    }
+    .hub-card.soft-green .tag {
+      background: var(--sand);
+    }
+    .hub-card h2 {
+      margin: 0 0 6px;
+      font-size: 20px;
+      font-weight: 700;
+    }
+    .hub-card .desc {
+      margin: 0 0 18px;
+      font-size: 13.5px;
+      color: var(--muted);
+    }
+    .download-flex {
+      display: flex;
+      gap: 18px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+    .qr-box {
+      background: var(--sand);
+      border: 1px solid var(--grey);
+      border-radius: 16px;
+      padding: 12px;
+      flex-shrink: 0;
+    }
+    .qr-box canvas {
+      display: block;
+      image-rendering: pixelated;
+    }
+    .mini-steps {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 13px;
+      color: var(--text);
+      flex: 1;
+      min-width: 180px;
+    }
+    .mini-steps li { margin-bottom: 8px; }
+    .mini-steps li:last-child { margin-bottom: 0; }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      text-decoration: none;
+      background: var(--green);
+      color: #fff;
+      font-weight: 700;
+      font-size: 14.5px;
+      padding: 14px 18px;
+      border-radius: 14px;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-primary:hover { background: var(--green-deep); }
+
+    .therapist-list {
+      margin: 0 0 20px;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 10px;
+    }
+    .therapist-list li {
+      background: var(--sand);
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 13px;
+      color: var(--text);
+    }
+    .therapist-list strong {
+      display: block;
+      font-size: 13.5px;
+      color: var(--green);
+      margin-bottom: 2px;
+    }
+
+    /* Footer */
+    footer {
+      padding: 20px 0 40px;
+    }
+    .disclaimer {
+      background: var(--amber-soft);
+      border-radius: 18px;
+      padding: 16px 18px;
+      font-size: 12.5px;
+      color: var(--text);
+    }
+    .copyright {
+      margin-top: 14px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    @media (max-width: 780px) {
+      .hero-card, .grid-3, .hub-grid {
+        grid-template-columns: 1fr;
+      }
+      .hero-card { padding: 26px 20px; }
+      .nav-link { display: none; }
+      .download-flex { justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container nav">
+      <a class="brand" href="/">
+        <span class="brand-icon" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 100 100" fill="none">
+            <path d="M72 25 C56 16, 26 20, 26 36 C26 48, 40 48, 46 48 L53 35 L60 55 C74 58, 76 78, 52 80 C38 81, 27 76, 24 72"
+              stroke="#1F5C4A" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="53" cy="35" r="8" fill="#E8A24F"/>
+          </svg>
+        </span>
+        <span>Siband</span>
+      </a>
+      <div class="nav-links">
+        <a class="nav-link" href="#cara-kerja">Cara Kerja</a>
+        <a class="nav-link" href="#unduh">Unduh APK</a>
+        <a class="nav-cta" href="/share">Buka Rekap Terapis</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero-section">
+      <div class="hero-card">
+        <div>
+          <span class="eyebrow">Pendampingan Harian Anak</span>
+          <h1>Pantau pola detak jantung &amp; catatan harian anak dengan tenang.</h1>
+          <p>
+            Siband menghubungkan smartwatch anak dengan jurnal kejadian pendamping, membantu orang tua
+            dan terapis melihat pola perubahan dari waktu ke waktu secara terstruktur dan aman.
+          </p>
+          <div class="hero-actions">
+            <a class="btn-light" href="#unduh">Unduh Aplikasi Android</a>
+            <a class="btn-ghost" href="/share">Akses Rekap Terapis</a>
+          </div>
+        </div>
+        <div class="hero-visual" aria-hidden="true">
+          <div class="hero-visual-badge">Pemantauan Berbasis Baseline Anak</div>
+          <svg width="100%" height="58" viewBox="0 0 220 58" fill="none" style="max-width:220px;">
+            <path d="M8 38 L52 38 L66 38 L78 16 L90 46 L102 32 L114 38 L156 38 L168 24 L178 42 L188 38 L212 38"
+              stroke="#E3EEDF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="78" cy="16" r="5" fill="#E8A24F"/>
+          </svg>
+          <div class="hero-metric">82 <span>BPM</span></div>
+          <span class="hero-pill">Tautan berbagi aman ber-PIN</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="cara-kerja">
+      <h2 class="section-title">Cara kerja Siband</h2>
+      <p class="section-sub">Tiga langkah sederhana yang menghubungkan jam tangan, orang tua, dan terapis.</p>
+      <div class="grid-3">
+        <div class="step-card">
+          <div class="step-num">1</div>
+          <h3>Smartwatch ke aplikasi</h3>
+          <p>Jam tangan mengirim detak jantung anak secara berkala ke aplikasi Siband di ponsel pendamping.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">2</div>
+          <h3>Konteks catatan harian</h3>
+          <p>Pendamping mencatat kejadian sekitar anak sehingga kenaikan detak jantung memiliki konteks nyata.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">3</div>
+          <h3>Rekap aman untuk terapis</h3>
+          <p>Bagikan rekap lewat tautan, QR, atau kode akses + PIN terpisah yang bisa dicabut kapan saja.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="unduh">
+      <div class="hub-grid">
+        <!-- Kartu Unduh APK + QR langsung di Landing Page -->
+        <div class="hub-card">
+          <div>
+            <span class="tag">Untuk Orang Tua &amp; Pendamping</span>
+            <h2>Unduh Aplikasi Siband (Android)</h2>
+            <p class="desc">Pindai QR langsung dari kamera HP Android atau ketuk tombol di bawah untuk memasang aplikasi.</p>
+            <div class="download-flex">
+              <div class="qr-box">
+                <canvas id="qr-canvas" width="168" height="168" aria-label="QR Code unduh APK Siband"></canvas>
+              </div>
+              <ol class="mini-steps">
+                <li>Pindai QR ini atau ketuk <strong>Unduh Siband APK</strong>.</li>
+                <li>Buka file yang terunduh dan izinkan pemasangan aplikasi Android.</li>
+                <li>Buka <strong>Siband</strong>, daftar atau masuk akun, lalu sambungkan smartwatch.</li>
+              </ol>
+            </div>
+          </div>
+          <a class="btn-primary" id="apk-link" href="/download/siband.apk">Unduh Siband APK</a>
+        </div>
+
+        <!-- Kartu Akses Rekap Terapis -->
+        <div class="hub-card soft-green" id="terapis">
+          <div>
+            <span class="tag">Untuk Terapis &amp; Penerima Tautan</span>
+            <h2>Buka Rekap Terapis</h2>
+            <p class="desc">Tidak perlu memasang aplikasi. Rekap dapat dibuka langsung melalui browser HP maupun laptop.</p>
+            <ul class="therapist-list">
+              <li>
+                <strong>Punya tautan atau QR dari orang tua?</strong>
+                Pindai QR tautan dari aplikasi Siband atau klik tautan yang dikirimkan.
+              </li>
+              <li>
+                <strong>Punya Kode Akses 6 huruf + PIN?</strong>
+                Buka halaman Rekap Terapis lalu masukkan kode akses serta PIN yang dikirim terpisah.
+              </li>
+            </ul>
+          </div>
+          <a class="btn-primary" href="/share">Buka Halaman Rekap Terapis</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="container">
+    <div class="disclaimer">
+      <strong>Catatan Penting:</strong> Siband bukan alat diagnosis medis dan bukan pengganti tenaga profesional.
+      Kenaikan detak jantung dapat dipicu banyak hal. Seluruh data dan tautan berbagi berada dalam kendali orang tua
+      serta dapat dicabut kapan saja.
+    </div>
+    <div class="copyright">Siband · Pemantauan Detak Jantung &amp; Catatan Kejadian Harian Anak</div>
+  </footer>
+
+  <script>
+    // Self-contained QR Code (Byte mode, ECC Level M, Version 1..10) - 100% offline.
+    (function () {
+      var EXP = new Uint8Array(512), LOG = new Uint8Array(256);
+      for (var i = 0, v = 1; i < 255; i++) {
+        EXP[i] = v; EXP[i + 255] = v; LOG[v] = i;
+        v = (v << 1) ^ (v & 128 ? 0x11d : 0);
+      }
+      function gfMul(a, b) { return a && b ? EXP[LOG[a] + LOG[b]] : 0; }
+      function rsGen(deg) {
+        var poly = [1];
+        for (var i = 0; i < deg; i++) {
+          var next = new Array(poly.length + 1).fill(0);
+          for (var j = 0; j < poly.length; j++) {
+            next[j] ^= poly[j];
+            next[j + 1] ^= gfMul(poly[j], EXP[i]);
+          }
+          poly = next;
+        }
+        return poly;
+      }
+      function rsRem(data, ecLen) {
+        var gen = rsGen(ecLen);
+        var rem = new Array(ecLen).fill(0);
+        for (var i = 0; i < data.length; i++) {
+          var factor = data[i] ^ rem.shift();
+          rem.push(0);
+          for (var j = 0; j < ecLen; j++) rem[j] ^= gfMul(gen[j + 1], factor);
+        }
+        return rem;
+      }
+      var VER_INFO = [
+        null,
+        [26, 10, 1, []],
+        [44, 16, 1, [6, 18]],
+        [70, 26, 1, [6, 22]],
+        [100, 18, 2, [6, 26]],
+        [134, 24, 2, [6, 30]],
+        [172, 16, 4, [6, 34]],
+        [196, 18, 4, [6, 22, 38]],
+        [242, 22, 4, [6, 24, 42]],
+        [292, 22, 5, [6, 26, 46]],
+        [346, 26, 5, [6, 28, 50]]
+      ];
+      function encodeQR(text) {
+        var bytes = new TextEncoder().encode(text);
+        var ver = 1;
+        while (ver <= 10) {
+          var info = VER_INFO[ver];
+          var dataCap = info[0] - info[1] * info[2];
+          var overhead = ver < 10 ? 2 : 3;
+          if (bytes.length + overhead <= dataCap) break;
+          ver++;
+        }
+        var info = VER_INFO[ver];
+        var totalCw = info[0], ecPerBlock = info[1], numBlocks = info[2], aligns = info[3];
+        var dataCap = totalCw - ecPerBlock * numBlocks;
+        var bits = [];
+        function pushBits(val, len) {
+          for (var i = len - 1; i >= 0; i--) bits.push((val >> i) & 1);
+        }
+        pushBits(0b0100, 4);
+        pushBits(bytes.length, ver < 10 ? 8 : 16);
+        for (var i = 0; i < bytes.length; i++) pushBits(bytes[i], 8);
+        for (var i = 0; i < 4 && bits.length < dataCap * 8; i++) bits.push(0);
+        while (bits.length % 8 !== 0) bits.push(0);
+        var dataCws = [];
+        for (var i = 0; i < bits.length; i += 8) {
+          var b = 0;
+          for (var j = 0; j < 8; j++) b = (b << 1) | bits[i + j];
+          dataCws.push(b);
+        }
+        var padBytes = [0xEC, 0x11], pi = 0;
+        while (dataCws.length < dataCap) { dataCws.push(padBytes[pi]); pi ^= 1; }
+        var shortLen = Math.floor(dataCap / numBlocks);
+        var numLong = dataCap % numBlocks;
+        var numShort = numBlocks - numLong;
+        var blocks = [], ecBlocks = [], offset = 0;
+        for (var b = 0; b < numBlocks; b++) {
+          var len = shortLen + (b >= numShort ? 1 : 0);
+          var blk = dataCws.slice(offset, offset + len);
+          offset += len;
+          blocks.push(blk);
+          ecBlocks.push(rsRem(blk, ecPerBlock));
+        }
+        var finalCws = [];
+        var maxDataLen = shortLen + (numLong > 0 ? 1 : 0);
+        for (var i = 0; i < maxDataLen; i++) {
+          for (var b = 0; b < numBlocks; b++) if (i < blocks[b].length) finalCws.push(blocks[b][i]);
+        }
+        for (var i = 0; i < ecPerBlock; i++) {
+          for (var b = 0; b < numBlocks; b++) finalCws.push(ecBlocks[b][i]);
+        }
+        var size = ver * 4 + 17;
+        var mod = Array.from({ length: size }, function () { return new Int8Array(size); });
+        var isFunc = Array.from({ length: size }, function () { return new Uint8Array(size); });
+        function setFunc(r, c, val) {
+          if (r >= 0 && r < size && c >= 0 && c < size) {
+            mod[r][c] = val ? 1 : 0;
+            isFunc[r][c] = 1;
+          }
+        }
+        function drawFinder(r0, c0) {
+          for (var dr = -1; dr <= 7; dr++) {
+            for (var dc = -1; dc <= 7; dc++) {
+              var d = Math.max(Math.abs(dr - 3), Math.abs(dc - 3));
+              setFunc(r0 + dr, c0 + dc, d !== 2 && d !== 4);
+            }
+          }
+        }
+        drawFinder(0, 0); drawFinder(0, size - 7); drawFinder(size - 7, 0);
+        for (var i = 8; i < size - 8; i++) {
+          setFunc(6, i, i % 2 === 0);
+          setFunc(i, 6, i % 2 === 0);
+        }
+        for (var i = 0; i < aligns.length; i++) {
+          for (var j = 0; j < aligns.length; j++) {
+            var r = aligns[i], c = aligns[j];
+            if (isFunc[r][c]) continue;
+            for (var dr = -2; dr <= 2; dr++) {
+              for (var dc = -2; dc <= 2; dc++) {
+                setFunc(r + dr, c + dc, Math.max(Math.abs(dr), Math.abs(dc)) !== 1);
+              }
+            }
+          }
+        }
+        for (var i = 0; i <= 8; i++) {
+          if (i !== 6) { setFunc(8, i, 0); setFunc(i, 8, 0); }
+        }
+        for (var i = size - 8; i < size; i++) { setFunc(8, i, 0); setFunc(i, 8, 0); }
+        setFunc(size - 8, 8, 1);
+        if (ver >= 7) {
+          var vrem = ver;
+          for (var i = 0; i < 12; i++) vrem = (vrem << 1) ^ ((vrem >> 11) * 0x1F25);
+          var vbits = (ver << 12) | vrem;
+          for (var i = 0; i < 18; i++) {
+            var bit = (vbits >> i) & 1;
+            var a = size - 11 + (i % 3), b = Math.floor(i / 3);
+            setFunc(a, b, bit); setFunc(b, a, bit);
+          }
+        }
+        var bitIdx = 0;
+        for (var right = size - 1; right >= 1; right -= 2) {
+          if (right === 6) right = 5;
+          var upward = ((right + 1) & 2) === 0;
+          for (var vert = 0; vert < size; vert++) {
+            var r = upward ? size - 1 - vert : vert;
+            for (var j = 0; j < 2; j++) {
+              var c = right - j;
+              if (!isFunc[r][c]) {
+                var bit = bitIdx < finalCws.length * 8
+                  ? ((finalCws[bitIdx >> 3] >> (7 - (bitIdx & 7))) & 1)
+                  : 0;
+                bitIdx++;
+                if (((r + c) & 1) === 0) bit ^= 1;
+                mod[r][c] = bit;
+              }
+            }
+          }
+        }
+        var fmt = 0x5412;
+        for (var i = 0; i <= 5; i++) setFunc(8, i, (fmt >> (14 - i)) & 1);
+        setFunc(8, 7, (fmt >> 8) & 1);
+        setFunc(8, 8, (fmt >> 7) & 1);
+        setFunc(7, 8, (fmt >> 6) & 1);
+        for (var i = 9; i < 15; i++) setFunc(14 - i, 8, (fmt >> (14 - i)) & 1);
+        for (var i = 0; i < 8; i++) setFunc(8, size - 1 - i, (fmt >> i) & 1);
+        for (var i = 8; i < 15; i++) setFunc(size - 15 + i, 8, (fmt >> i) & 1);
+        setFunc(size - 8, 8, 1);
+        return mod;
+      }
+
+      var apkUrl = window.location.origin + "/download/siband.apk";
+      document.getElementById("apk-link").href = apkUrl;
+      var canvas = document.getElementById("qr-canvas");
+      var ctx = canvas.getContext("2d");
+      var matrix = encodeQR(apkUrl);
+      var n = matrix.length;
+      var quiet = 3;
+      var scale = Math.max(3, Math.floor(canvas.width / (n + quiet * 2)));
+      var dim = (n + quiet * 2) * scale;
+      canvas.width = dim;
+      canvas.height = dim;
+      ctx.fillStyle = "#F6F4EF";
+      ctx.fillRect(0, 0, dim, dim);
+      ctx.fillStyle = "#1E2A24";
+      for (var r = 0; r < n; r++) {
+        for (var c = 0; c < n; c++) {
+          if (matrix[r][c]) {
+            ctx.fillRect((c + quiet) * scale, (r + quiet) * scale, scale, scale);
+          }
+        }
+      }
+    })();
+  </script>
+</body>
+</html>
