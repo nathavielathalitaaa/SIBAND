@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../models/child_model.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
+import '../services/config_service.dart';
 import '../utils/event_type_helper.dart';
 import '../utils/share_helper.dart';
 import 'onboarding_screen.dart';
@@ -604,7 +606,7 @@ class _RecapScreenState extends State<RecapScreen> {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      // Kartu Tautan + Kode Akses (bagian utama untuk dibagikan)
+                      // QR Code offline untuk dipindai ponsel juri / laptop terapis
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
@@ -615,45 +617,196 @@ class _RecapScreenState extends State<RecapScreen> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Text(
                               childName.isNotEmpty
                                   ? 'Berita informasi terakhir tentang $childName!'
                                   : 'Berita informasi terakhir dari Siband!',
+                              textAlign: TextAlign.center,
                               style: GoogleFonts.inter(
                                 fontSize: 13.5,
                                 fontWeight: FontWeight.w700,
                                 color: const Color(0xFF1F5C4A),
                               ),
                             ),
+                            const SizedBox(height: 12),
+                            Center(
+                              child: Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF6F4EF),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: const Color(0xFFD9DED6),
+                                  ),
+                                ),
+                                child: QrImageView(
+                                  data: createdUrl!,
+                                  version: QrVersions.auto,
+                                  size: 164,
+                                  backgroundColor: const Color(0xFFF6F4EF),
+                                  eyeStyle: const QrEyeStyle(
+                                    eyeShape: QrEyeShape.square,
+                                    color: Color(0xFF1F5C4A),
+                                  ),
+                                  dataModuleStyle: const QrDataModuleStyle(
+                                    dataModuleShape: QrDataModuleShape.square,
+                                    color: Color(0xFF1E2A24),
+                                  ),
+                                ),
+                              ),
+                            ),
                             const SizedBox(height: 8),
+                            Text(
+                              'Pindai QR ini dari ponsel juri atau laptop terapis',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.inter(
+                                fontSize: 11.5,
+                                color: const Color(0xFF6F7B74),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
                             SelectableText(
                               createdUrl!,
+                              textAlign: TextAlign.center,
                               style: GoogleFonts.inter(
-                                fontSize: 12.5,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w500,
                                 color: const Color(0xFF1E2A24),
                               ),
                             ),
-                            if (createdShortCode != null && createdShortCode!.isNotEmpty) ...[
-                              const SizedBox(height: 10),
+                            if (createdUrl!.startsWith('http://127.0.0.1') ||
+                                createdUrl!.startsWith('http://localhost')) ...[
+                              const SizedBox(height: 8),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFE3EEDF),
+                                  color: Color.alphaBlend(
+                                    const Color(0xFFE8A24F).withValues(alpha: 0.16),
+                                    const Color(0xFFF6F4EF),
+                                  ),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Text(
-                                  'Kode akses: $createdShortCode',
+                                  'Tautan masih memakai alamat lokal (127.0.0.1). Atur IP LAN server agar bisa dipindai perangkat lain.',
                                   style: GoogleFonts.inter(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: const Color(0xFF1F5C4A),
+                                    fontSize: 11,
+                                    color: const Color(0xFF1E2A24),
+                                    height: 1.35,
                                   ),
                                 ),
                               ),
                             ],
+                            const SizedBox(height: 8),
+                            Wrap(
+                              alignment: WrapAlignment.center,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: [
+                                if (createdShortCode != null && createdShortCode!.isNotEmpty)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFE3EEDF),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      'Kode akses: $createdShortCode',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: const Color(0xFF1F5C4A),
+                                      ),
+                                    ),
+                                  ),
+                                TextButton(
+                                  onPressed: () async {
+                                    final cs = ConfigService();
+                                    final currentShare = await cs.getShareBaseUrl() ?? '';
+                                    if (!sheetContext.mounted) return;
+                                    final ctrl = TextEditingController(text: currentShare);
+                                    final saved = await showDialog<String>(
+                                      context: sheetContext,
+                                      builder: (dCtx) => AlertDialog(
+                                        backgroundColor: const Color(0xFFF6F4EF),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        title: Text(
+                                          'Atur alamat LAN berbagi',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                            color: const Color(0xFF1E2A24),
+                                          ),
+                                        ),
+                                        content: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Masukkan IP LAN Laptop 1 (contoh: http://192.168.1.10:8000) agar QR & tautan dapat dibuka perangkat lain di router lokal.',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 12,
+                                                color: const Color(0xFF6F7B74),
+                                                height: 1.4,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 12),
+                                            TextField(
+                                              controller: ctrl,
+                                              keyboardType: TextInputType.url,
+                                              decoration: InputDecoration(
+                                                hintText: 'http://192.168.1.10:8000',
+                                                border: OutlineInputBorder(
+                                                  borderRadius: BorderRadius.circular(12),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(dCtx),
+                                            child: const Text('Batal'),
+                                          ),
+                                          ElevatedButton(
+                                            onPressed: () => Navigator.pop(dCtx, ctrl.text),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(0xFF1F5C4A),
+                                              foregroundColor: Colors.white,
+                                            ),
+                                            child: const Text('Simpan'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (saved != null && createdToken != null) {
+                                      await cs.setShareBaseUrl(saved);
+                                      final updatedUrl = await shareUrl(createdToken!);
+                                      setSheetState(() {
+                                        createdUrl = updatedUrl;
+                                      });
+                                    }
+                                  },
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: const Color(0xFF1F5C4A),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: Text(
+                                    'Atur alamat LAN',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       ),

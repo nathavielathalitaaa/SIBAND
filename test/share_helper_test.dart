@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:siband/models/child_model.dart';
@@ -75,6 +76,15 @@ void main() {
       });
       final url = await shareUrl('xyz789');
       expect(url, 'https://my-domain.org/share#xyz789');
+    });
+
+    test('shareUrl prioritizes shareBaseUrlKey (LAN IP) even when apiBaseUrlKey is 127.0.0.1', () async {
+      SharedPreferences.setMockInitialValues({
+        ConfigService.apiBaseUrlKey: 'http://127.0.0.1:8000/api',
+        ConfigService.shareBaseUrlKey: 'http://192.168.1.10:8000',
+      });
+      final url = await shareUrl('lan-tok-42');
+      expect(url, 'http://192.168.1.10:8000/share#lan-tok-42');
     });
 
     test('formatTherapistShareMessage formats friendly message with child name & short code, excluding PIN', () {
@@ -178,13 +188,15 @@ void main() {
         findsOneWidget,
       );
 
-      // Verify generated URL, short code, and separate PIN section
+      // Verify generated QR code, URL, short code, and separate PIN section
+      expect(find.byType(QrImageView), findsOneWidget);
       expect(
         find.text('http://127.0.0.1:8000/share#mocked_share_token_abcdef'),
         findsOneWidget,
       );
       expect(find.text('Kode akses: SB7K4M'), findsOneWidget);
       expect(find.text('PIN: 482910'), findsOneWidget);
+      expect(find.text('Atur alamat LAN'), findsOneWidget);
 
       // Tap Bagikan Tautan -> sends friendly message + URL + short code, WITHOUT PIN
       final shareLinkBtn = find.widgetWithText(ElevatedButton, 'Bagikan Tautan');

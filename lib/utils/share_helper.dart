@@ -18,12 +18,17 @@ String extractOrigin(String baseUrl) {
   return trimmed;
 }
 
-/// Membentuk tautan berbagi rekap terapis dari token: `<origin>/share#<token>`
-/// dengan origin diambil dari baseUrl config_service tanpa akhiran "/api".
+/// Membentuk tautan berbagi rekap terapis dari token: `<origin>/share#<token>`.
+/// Memprioritaskan `SHARE_BASE_URL` / alamat LAN berbagi bila diatur agar
+/// perangkat lain di router lokal (laptop terapis & ponsel juri) dapat membukanya
+/// meski HP terhubung ke server melalui USB (`127.0.0.1`).
 Future<String> shareUrl(String token, {ConfigService? configService}) async {
   final cs = configService ?? ConfigService();
-  final baseUrl = await cs.getBaseUrl();
-  final origin = extractOrigin(baseUrl);
+  final shareBase = await cs.getShareBaseUrl();
+  final rawBase = (shareBase != null && shareBase.isNotEmpty)
+      ? shareBase
+      : await cs.getBaseUrl();
+  final origin = extractOrigin(rawBase);
   return '$origin/share#$token';
 }
 
