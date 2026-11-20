@@ -2156,7 +2156,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       children: [
         Semantics(
-          label: '+ Catatan kejadian',
+          label: 'Catatan kejadian',
           button: true,
           child: SizedBox(
             height: 54,
@@ -2190,7 +2190,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 size: 20,
               ),
               label: Text(
-                '+ Catatan kejadian',
+                'Catatan kejadian',
                 style: GoogleFonts.inter(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,

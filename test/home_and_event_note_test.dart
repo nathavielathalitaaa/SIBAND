@@ -275,7 +275,8 @@ void main() {
       expect(find.text('Pemantauan detak jantung · bukan diagnosis'), findsOneWidget);
 
       // Event note button & warning text
-      expect(find.text('+ Catatan kejadian'), findsOneWidget);
+      expect(find.text('Catatan kejadian'), findsOneWidget);
+      expect(find.text('+ Catatan kejadian'), findsNothing);
       expect(find.text('Detak jantung naik bisa dipicu banyak hal.'), findsOneWidget);
     });
 

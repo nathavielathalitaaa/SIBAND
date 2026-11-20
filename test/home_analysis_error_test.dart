@@ -110,7 +110,7 @@ void main() {
 
       // Beranda tetap menampilkan kartu BPM dan tombol catatan saat analisis gagal.
       expect(find.text('PEMANTAUAN DETAK JANTUNG'), findsOneWidget);
-      expect(find.text('+ Catatan kejadian'), findsOneWidget);
+      expect(find.text('Catatan kejadian'), findsOneWidget);
 
       // Teks kecil abu dan tombol Coba lagi tampil.
       expect(find.text('Data analisis belum bisa dimuat'), findsOneWidget);
@@ -170,7 +170,7 @@ void main() {
       // Data yang sudah tampil tetap dipertahankan, kartu BPM & tombol catatan ada.
       expect(find.text('Grafik pemantauan hari ini (Asia/Jakarta)'), findsOneWidget);
       expect(find.text('PEMANTAUAN DETAK JANTUNG'), findsOneWidget);
-      expect(find.text('+ Catatan kejadian'), findsOneWidget);
+      expect(find.text('Catatan kejadian'), findsOneWidget);
       expect(find.text('Data analisis belum bisa dimuat'), findsOneWidget);
       expect(find.widgetWithText(TextButton, 'Coba lagi'), findsOneWidget);
     },

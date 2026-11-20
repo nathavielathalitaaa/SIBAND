@@ -504,7 +504,7 @@ void main() {
           findsOneWidget,
         );
         expect(find.text('Kualitas data & pola kejadian'), findsNothing);
-        expect(find.text('+ Catatan kejadian'), findsOneWidget);
+        expect(find.text('Catatan kejadian'), findsOneWidget);
       },
     );
 
