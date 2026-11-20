@@ -9,6 +9,30 @@ import '../utils/event_type_helper.dart';
 import 'manage_children_screen.dart';
 import 'onboarding_screen.dart';
 
+final RegExp _tzSuffixPattern = RegExp(r'(?:[Zz]|[+-]\d{2}:?\d{2})$');
+
+String formatServerNoteTime(dynamic raw) {
+  if (raw == null) return '-';
+  final str = raw.toString().trim();
+  if (str.isEmpty) return '-';
+
+  var normalized = str.contains(' ') ? str.replaceFirst(' ', 'T') : str;
+  if (!_tzSuffixPattern.hasMatch(normalized)) {
+    normalized = '${normalized}Z';
+  }
+
+  final parsed = DateTime.tryParse(normalized);
+  if (parsed == null) return str;
+
+  final dt = parsed.toLocal();
+  final day = dt.day.toString().padLeft(2, '0');
+  final month = dt.month.toString().padLeft(2, '0');
+  final year = dt.year;
+  final hour = dt.hour.toString().padLeft(2, '0');
+  final minute = dt.minute.toString().padLeft(2, '0');
+  return '$day/$month/$year, $hour:$minute';
+}
+
 class JournalPrivacyScreen extends StatefulWidget {
   final ChildModel? initialChild;
   final VoidCallback? onChildrenChanged;
@@ -111,19 +135,7 @@ class _JournalPrivacyScreenState extends State<JournalPrivacyScreen> {
     }
   }
 
-  String _formatNoteTime(dynamic raw) {
-    if (raw == null) return '-';
-    final str = raw.toString().trim();
-    if (str.isEmpty) return '-';
-    final dt = DateTime.tryParse(str);
-    if (dt == null) return str;
-    final day = dt.day.toString().padLeft(2, '0');
-    final month = dt.month.toString().padLeft(2, '0');
-    final year = dt.year;
-    final hour = dt.hour.toString().padLeft(2, '0');
-    final minute = dt.minute.toString().padLeft(2, '0');
-    return '$day/$month/$year, $hour:$minute';
-  }
+  String _formatNoteTime(dynamic raw) => formatServerNoteTime(raw);
 
   Future<bool> _confirmAndDeleteNote(Map<String, dynamic> item) async {
     final rawId = item['id'];
