@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
+import '../services/config_service.dart';
 import '../widgets/siband_logo.dart';
 import 'main_navigation_screen.dart';
 import 'register_screen.dart';
@@ -36,6 +37,92 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  Future<void> _showServerConfigDialog() async {
+    final configService = ConfigService();
+    final currentUrl = await configService.getBaseUrl();
+    if (!mounted) return;
+
+    final controller = TextEditingController(text: currentUrl);
+    final savedUrl = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFFF6F4EF),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Atur alamat server',
+          style: GoogleFonts.inter(
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            color: const Color(0xFF1E2A24),
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Masukkan alamat server Siband (misal http://192.168.1.10:8000 atau https://domain-anda.com). Akhiran /api ditambahkan otomatis.',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: const Color(0xFF6F7B74),
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.url,
+              decoration: InputDecoration(
+                hintText: 'http://192.168.1.10:8000',
+                filled: true,
+                fillColor: Color.alphaBlend(
+                  const Color(0xFFD9DED6).withValues(alpha: 0.30),
+                  const Color(0xFFF6F4EF),
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Batal',
+              style: GoogleFonts.inter(color: const Color(0xFF6F7B74)),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, controller.text),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1F5C4A),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Simpan'),
+          ),
+        ],
+      ),
+    );
+
+    if (savedUrl != null) {
+      await configService.setBaseUrl(savedUrl);
+      final effective = await configService.getBaseUrl();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Server disimpan: $effective'),
+          backgroundColor: const Color(0xFF1F5C4A),
+        ),
+      );
+    }
+  }
+
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -58,7 +145,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(result['message'] ?? 'Login berhasil'),
-          backgroundColor: Colors.green,
+          backgroundColor: const Color(0xFF1F5C4A),
         ),
       );
 
@@ -70,7 +157,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(result['message'] ?? 'Login gagal'),
-          backgroundColor: Colors.red,
+          backgroundColor: const Color(0xFFE8A24F),
         ),
       );
     }
@@ -99,7 +186,41 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          SizedBox(height: height * 0.20),
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: Semantics(
+                              label: 'Atur server',
+                              button: true,
+                              child: TextButton.icon(
+                                onPressed: _showServerConfigDialog,
+                                icon: const Icon(
+                                  Icons.dns_outlined,
+                                  size: 16,
+                                  color: Color(0xFF1F5C4A),
+                                ),
+                                label: Text(
+                                  'Atur server',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF1F5C4A),
+                                  ),
+                                ),
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
+                                  minimumSize: const Size(0, 36),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  backgroundColor: const Color(0xFFE3EEDF),
+                                  shape: const StadiumBorder(),
+                                ),
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: (height * 0.12).clamp(16.0, 96.0)),
                           // Sementara, ganti dengan logo dari desain tim.
                           const Center(child: SibandLogo(size: 56)),
                           const SizedBox(height: 16),

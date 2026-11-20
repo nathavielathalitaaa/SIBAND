@@ -8,6 +8,7 @@ import 'widgets/siband_logo.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  GoogleFonts.config.allowRuntimeFetching = false;
   runApp(const MyApp());
 }
 

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:siband/screens/login_screen.dart';
 import 'package:siband/screens/register_screen.dart';
+import 'package:siband/services/config_service.dart';
 
 void main() {
   Widget buildTestable(Widget child, {Size size = const Size(412, 915)}) {
@@ -83,6 +85,28 @@ void main() {
 
       expect(find.text('Email tidak boleh kosong'), findsOneWidget);
       expect(find.text('Kata sandi tidak boleh kosong'), findsOneWidget);
+    });
+
+    test('ConfigService.normalizeApiBaseUrl normalizes scheme and /api suffix', () {
+      expect(ConfigService.normalizeApiBaseUrl('192.168.1.10:8000'), 'http://192.168.1.10:8000/api');
+      expect(ConfigService.normalizeApiBaseUrl('http://192.168.1.10:8000/'), 'http://192.168.1.10:8000/api');
+      expect(ConfigService.normalizeApiBaseUrl('https://siband.id/api/'), 'https://siband.id/api');
+    });
+
+    testWidgets('Tombol Atur server di LoginScreen menyimpan alamat server yang dinormalkan', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      await tester.pumpWidget(buildTestable(const LoginScreen()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Atur server'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Atur alamat server'), findsOneWidget);
+      await tester.enterText(find.byType(TextField).last, '192.168.1.10:8000');
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Simpan'));
+      await tester.pumpAndSettle();
+
+      expect(await ConfigService().getBaseUrl(), 'http://192.168.1.10:8000/api');
     });
   });
 

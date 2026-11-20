@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Unduh Aplikasi Siband (Android APK)</title>
+  <style>
+    :root {
+      --green: #1F5C4A;
+      --green-soft: #E3EEDF;
+      --sand: #F6F4EF;
+      --amber: #E8A24F;
+      --grey: #D9DED6;
+      --text: #1E2A24;
+      --muted: #6F7B74;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--sand);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 24px 16px 40px;
+    }
+    .wrap {
+      max-width: 520px;
+      margin: 0 auto;
+    }
+    .hero {
+      background: linear-gradient(135deg, #1F5C4A, #184739);
+      color: #fff;
+      border-radius: 24px;
+      padding: 24px;
+      text-align: center;
+      box-shadow: 0 10px 24px rgba(31, 92, 74, 0.18);
+    }
+    .logo {
+      width: 60px;
+      height: 60px;
+      border-radius: 16px;
+      background: var(--green-soft);
+      margin: 0 auto 12px;
+      display: grid;
+      place-items: center;
+    }
+    .hero h1 {
+      margin: 0 0 6px;
+      font-size: 22px;
+      font-weight: 700;
+    }
+    .hero p {
+      margin: 0;
+      font-size: 13.5px;
+      opacity: 0.88;
+    }
+    .card {
+      background: rgba(217, 222, 214, 0.30);
+      border-radius: 20px;
+      padding: 20px;
+      margin-top: 16px;
+    }
+    .qr-box {
+      background: var(--sand);
+      border: 1px solid var(--grey);
+      border-radius: 18px;
+      padding: 16px;
+      width: fit-content;
+      margin: 0 auto 12px;
+    }
+    canvas {
+      display: block;
+      image-rendering: pixelated;
+    }
+    .caption {
+      text-align: center;
+      font-size: 12.5px;
+      color: var(--muted);
+      margin: 0 0 14px;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      text-align: center;
+      text-decoration: none;
+      background: var(--green);
+      color: #fff;
+      font-weight: 700;
+      font-size: 15px;
+      padding: 14px 18px;
+      border-radius: 14px;
+      border: none;
+      cursor: pointer;
+    }
+    .btn:active { opacity: 0.9; }
+    .server-box {
+      background: var(--green-soft);
+      border-radius: 16px;
+      padding: 14px 16px;
+      margin-top: 16px;
+    }
+    .server-label {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .server-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .server-url {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--green);
+      word-break: break-all;
+      flex: 1;
+    }
+    .copy-btn {
+      background: var(--green);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .steps {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 13.5px;
+      color: var(--text);
+    }
+    .steps li { margin-bottom: 8px; }
+    .steps li:last-child { margin-bottom: 0; }
+    .note {
+      background: rgba(232, 162, 79, 0.16);
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 12px;
+      color: var(--text);
+      margin-top: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <div class="logo" aria-hidden="true">
+        <svg width="42" height="42" viewBox="0 0 100 100" fill="none">
+          <path d="M72 25 C56 16, 26 20, 26 36 C26 48, 40 48, 46 48 L53 35 L60 55 C74 58, 76 78, 52 80 C38 81, 27 76, 24 72"
+            stroke="#1F5C4A" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="53" cy="35" r="8" fill="#E8A24F"/>
+        </svg>
+      </div>
+      <h1>Unduh Siband APK</h1>
+      <p>Paket rilis Android (<code>id.siband.app</code>) siap pasang langsung di router lokal maupun internet.</p>
+    </div>
+
+    <div class="card">
+      <div class="qr-box">
+        <canvas id="qr-canvas" width="220" height="220" aria-label="QR Code unduh APK Siband"></canvas>
+      </div>
+      <p class="caption">Pindai QR ini dari kamera HP Android untuk langsung mengunduh file APK.</p>
+      <a class="btn" id="apk-link" href="/download/siband.apk">Unduh Siband APK</a>
+      <div class="note" id="url-preview"></div>
+    </div>
+
+    <div class="server-box">
+      <div class="server-label">Alamat server API untuk halaman Login (ketuk "Atur server" di aplikasi):</div>
+      <div class="server-row">
+        <span class="server-url" id="api-url"></span>
+        <button class="copy-btn" type="button" id="copy-api">Salin</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <strong style="display:block;margin-bottom:10px;font-size:14.5px;">Langkah pasang &amp; login (3 langkah)</strong>
+      <ol class="steps">
+        <li>Pindai QR di atas atau ketuk <strong>Unduh Siband APK</strong>, lalu izinkan pemasangan aplikasi dari browser bila diminta Android.</li>
+        <li>Buka aplikasi <strong>Siband</strong>. Jika server menggunakan IP router lokal, ketuk tombol <strong>Atur server</strong> di pojok kanan atas layar Login lalu tempel alamat API di atas.</li>
+        <li>Masukkan email dan kata sandi akun untuk langsung masuk ke Beranda.</li>
+      </ol>
+    </div>
+  </div>
+
+  <script>
+    // Minimal self-contained QR Code (Byte mode, ECC Level M, Version 1..10) - 100% offline.
+    (function () {
+      var EXP = new Uint8Array(512), LOG = new Uint8Array(256);
+      for (var i = 0, v = 1; i < 255; i++) {
+        EXP[i] = v; EXP[i + 255] = v; LOG[v] = i;
+        v = (v << 1) ^ (v & 128 ? 0x11d : 0);
+      }
+      function gfMul(a, b) { return a && b ? EXP[LOG[a] + LOG[b]] : 0; }
+      function rsGen(deg) {
+        var poly = [1];
+        for (var i = 0; i < deg; i++) {
+          var next = new Array(poly.length + 1).fill(0);
+          for (var j = 0; j < poly.length; j++) {
+            next[j] ^= poly[j];
+            next[j + 1] ^= gfMul(poly[j], EXP[i]);
+          }
+          poly = next;
+        }
+        return poly;
+      }
+      function rsRem(data, ecLen) {
+        var gen = rsGen(ecLen);
+        var rem = new Array(ecLen).fill(0);
+        for (var i = 0; i < data.length; i++) {
+          var factor = data[i] ^ rem.shift();
+          rem.push(0);
+          for (var j = 0; j < ecLen; j++) rem[j] ^= gfMul(gen[j + 1], factor);
+        }
+        return rem;
+      }
+
+      // Version 1..10 ECC Level M: [totalCodewords, ecPerBlock, numBlocks, alignPositions]
+      var VER_INFO = [
+        null,
+        [26, 10, 1, []],
+        [44, 16, 1, [6, 18]],
+        [70, 26, 1, [6, 22]],
+        [100, 18, 2, [6, 26]],
+        [134, 24, 2, [6, 30]],
+        [172, 16, 4, [6, 34]],
+        [196, 18, 4, [6, 22, 38]],
+        [242, 22, 4, [6, 24, 42]],
+        [292, 22, 5, [6, 26, 46]],
+        [346, 26, 5, [6, 28, 50]]
+      ];
+
+      function encodeQR(text) {
+        var bytes = new TextEncoder().encode(text);
+        var ver = 1;
+        while (ver <= 10) {
+          var info = VER_INFO[ver];
+          var dataCap = info[0] - info[1] * info[2];
+          var overhead = ver < 10 ? 2 : 3;
+          if (bytes.length + overhead <= dataCap) break;
+          ver++;
+        }
+        if (ver > 10) throw new Error("URL terlalu panjang untuk QR v10");
+
+        var info = VER_INFO[ver];
+        var totalCw = info[0], ecPerBlock = info[1], numBlocks = info[2], aligns = info[3];
+        var dataCap = totalCw - ecPerBlock * numBlocks;
+
+        var bits = [];
+        function pushBits(val, len) {
+          for (var i = len - 1; i >= 0; i--) bits.push((val >> i) & 1);
+        }
+        pushBits(0b0100, 4); // Byte mode
+        pushBits(bytes.length, ver < 10 ? 8 : 16);
+        for (var i = 0; i < bytes.length; i++) pushBits(bytes[i], 8);
+        for (var i = 0; i < 4 && bits.length < dataCap * 8; i++) bits.push(0);
+        while (bits.length % 8 !== 0) bits.push(0);
+
+        var dataCws = [];
+        for (var i = 0; i < bits.length; i += 8) {
+          var b = 0;
+          for (var j = 0; j < 8; j++) b = (b << 1) | bits[i + j];
+          dataCws.push(b);
+        }
+        var padBytes = [0xEC, 0x11], pi = 0;
+        while (dataCws.length < dataCap) { dataCws.push(padBytes[pi]); pi ^= 1; }
+
+        // Split into blocks (short blocks first)
+        var shortLen = Math.floor(dataCap / numBlocks);
+        var numLong = dataCap % numBlocks;
+        var numShort = numBlocks - numLong;
+        var blocks = [], ecBlocks = [], offset = 0;
+        for (var b = 0; b < numBlocks; b++) {
+          var len = shortLen + (b >= numShort ? 1 : 0);
+          var blk = dataCws.slice(offset, offset + len);
+          offset += len;
+          blocks.push(blk);
+          ecBlocks.push(rsRem(blk, ecPerBlock));
+        }
+
+        var finalCws = [];
+        var maxDataLen = shortLen + (numLong > 0 ? 1 : 0);
+        for (var i = 0; i < maxDataLen; i++) {
+          for (var b = 0; b < numBlocks; b++) if (i < blocks[b].length) finalCws.push(blocks[b][i]);
+        }
+        for (var i = 0; i < ecPerBlock; i++) {
+          for (var b = 0; b < numBlocks; b++) finalCws.push(ecBlocks[b][i]);
+        }
+
+        var size = ver * 4 + 17;
+        var mod = Array.from({ length: size }, function () { return new Int8Array(size); });
+        var isFunc = Array.from({ length: size }, function () { return new Uint8Array(size); });
+
+        function setFunc(r, c, val) {
+          if (r >= 0 && r < size && c >= 0 && c < size) {
+            mod[r][c] = val ? 1 : 0;
+            isFunc[r][c] = 1;
+          }
+        }
+        function drawFinder(r0, c0) {
+          for (var dr = -1; dr <= 7; dr++) {
+            for (var dc = -1; dc <= 7; dc++) {
+              var d = Math.max(Math.abs(dr - 3), Math.abs(dc - 3));
+              setFunc(r0 + dr, c0 + dc, d !== 2 && d !== 4);
+            }
+          }
+        }
+        drawFinder(0, 0);
+        drawFinder(0, size - 7);
+        drawFinder(size - 7, 0);
+
+        for (var i = 8; i < size - 8; i++) {
+          setFunc(6, i, i % 2 === 0);
+          setFunc(i, 6, i % 2 === 0);
+        }
+        for (var i = 0; i < aligns.length; i++) {
+          for (var j = 0; j < aligns.length; j++) {
+            var r = aligns[i], c = aligns[j];
+            if (isFunc[r][c]) continue;
+            for (var dr = -2; dr <= 2; dr++) {
+              for (var dc = -2; dc <= 2; dc++) {
+                setFunc(r + dr, c + dc, Math.max(Math.abs(dr), Math.abs(dc)) !== 1);
+              }
+            }
+          }
+        }
+        // Reserve format info + dark module
+        for (var i = 0; i <= 8; i++) {
+          if (i !== 6) { setFunc(8, i, 0); setFunc(i, 8, 0); }
+        }
+        for (var i = size - 8; i < size; i++) { setFunc(8, i, 0); setFunc(i, 8, 0); }
+        setFunc(size - 8, 8, 1);
+
+        // Version info (ver >= 7)
+        if (ver >= 7) {
+          var vrem = ver;
+          for (var i = 0; i < 12; i++) vrem = (vrem << 1) ^ ((vrem >> 11) * 0x1F25);
+          var vbits = (ver << 12) | vrem;
+          for (var i = 0; i < 18; i++) {
+            var bit = (vbits >> i) & 1;
+            var a = size - 11 + (i % 3), b = Math.floor(i / 3);
+            setFunc(a, b, bit);
+            setFunc(b, a, bit);
+          }
+        }
+
+        // Place data bits (mask 0: (r + c) % 2 === 0)
+        var bitIdx = 0;
+        for (var right = size - 1; right >= 1; right -= 2) {
+          if (right === 6) right = 5;
+          var upward = ((right + 1) & 2) === 0;
+          for (var vert = 0; vert < size; vert++) {
+            var r = upward ? size - 1 - vert : vert;
+            for (var j = 0; j < 2; j++) {
+              var c = right - j;
+              if (!isFunc[r][c]) {
+                var bit = bitIdx < finalCws.length * 8
+                  ? ((finalCws[bitIdx >> 3] >> (7 - (bitIdx & 7))) & 1)
+                  : 0;
+                bitIdx++;
+                if (((r + c) & 1) === 0) bit ^= 1; // Mask pattern 0
+                mod[r][c] = bit;
+              }
+            }
+          }
+        }
+
+        // Format bits for ECC Level M (00) + Mask 0 (000) => 5-bit data 00000 -> 15-bit masked: 0x5412
+        var fmt = 0x5412;
+        for (var i = 0; i <= 5; i++) setFunc(8, i, (fmt >> (14 - i)) & 1);
+        setFunc(8, 7, (fmt >> 8) & 1);
+        setFunc(8, 8, (fmt >> 7) & 1);
+        setFunc(7, 8, (fmt >> 6) & 1);
+        for (var i = 9; i < 15; i++) setFunc(14 - i, 8, (fmt >> (14 - i)) & 1);
+        for (var i = 0; i < 8; i++) setFunc(8, size - 1 - i, (fmt >> i) & 1);
+        for (var i = 8; i < 15; i++) setFunc(size - 15 + i, 8, (fmt >> i) & 1);
+        setFunc(size - 8, 8, 1);
+
+        return mod;
+      }
+
+      var origin = window.location.origin;
+      var apkUrl = origin + "/download/siband.apk";
+      var apiUrl = origin + "/api";
+
+      document.getElementById("apk-link").href = apkUrl;
+      document.getElementById("api-url").textContent = apiUrl;
+      document.getElementById("url-preview").textContent = "Tautan unduh: " + apkUrl;
+
+      document.getElementById("copy-api").addEventListener("click", function () {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(apiUrl).then(function () {
+            document.getElementById("copy-api").textContent = "Tersalin";
+            setTimeout(function () { document.getElementById("copy-api").textContent = "Salin"; }, 1800);
+          });
+        }
+      });
+
+      var canvas = document.getElementById("qr-canvas");
+      var ctx = canvas.getContext("2d");
+      try {
+        var matrix = encodeQR(apkUrl);
+        var n = matrix.length;
+        var quiet = 4;
+        var scale = Math.floor(canvas.width / (n + quiet * 2));
+        var dim = (n + quiet * 2) * scale;
+        canvas.width = dim;
+        canvas.height = dim;
+        ctx.fillStyle = "#F6F4EF";
+        ctx.fillRect(0, 0, dim, dim);
+        ctx.fillStyle = "#1E2A24";
+        for (var r = 0; r < n; r++) {
+          for (var c = 0; c < n; c++) {
+            if (matrix[r][c]) {
+              ctx.fillRect((c + quiet) * scale, (r + quiet) * scale, scale, scale);
+            }
+          }
+        }
+      } catch (e) {
+        ctx.fillStyle = "#1E2A24";
+        ctx.font = "13px sans-serif";
+        ctx.fillText("QR gagal dibuat: " + e.message, 10, 110);
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -12,6 +12,20 @@ class ConfigService {
   static const String apiBaseUrlKey = 'api_base_url';
   static const String shareBaseUrlKey = 'share_base_url';
 
+  /// Menormalkan input alamat server dari pengguna agar selalu memiliki skema
+  /// (`http://` atau `https://`) dan akhiran `/api` tanpa trailing slash.
+  static String normalizeApiBaseUrl(String raw) {
+    var trimmed = raw.trim().replaceAll(RegExp(r'/+$'), '');
+    if (trimmed.isEmpty) return '';
+    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+      trimmed = 'http://$trimmed';
+    }
+    if (!trimmed.endsWith('/api')) {
+      trimmed = '$trimmed/api';
+    }
+    return trimmed;
+  }
+
   Future<String> getBaseUrl() async {
     final prefs = await SharedPreferences.getInstance();
     final url = prefs.getString(apiBaseUrlKey);
@@ -23,8 +37,12 @@ class ConfigService {
 
   Future<void> setBaseUrl(String url) async {
     final prefs = await SharedPreferences.getInstance();
-    final trimmedUrl = url.trim().replaceAll(RegExp(r'/+$'), '');
-    await prefs.setString(apiBaseUrlKey, trimmedUrl);
+    final normalized = normalizeApiBaseUrl(url);
+    if (normalized.isEmpty) {
+      await prefs.remove(apiBaseUrlKey);
+    } else {
+      await prefs.setString(apiBaseUrlKey, normalized);
+    }
   }
 
   /// Alamat origin khusus untuk tautan berbagi lintas perangkat (misal IP LAN server).
