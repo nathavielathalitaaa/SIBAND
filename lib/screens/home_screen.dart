@@ -15,6 +15,7 @@ import '../widgets/watch_status_chip.dart';
 import 'event_note_screen.dart';
 import 'guide_calming_screen.dart';
 import 'pair_device_screen.dart';
+import 'pattern_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback? onNavigateToPanduan;
@@ -1929,6 +1930,111 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildPatternEntryCard() {
+    final analysis = _analysisData;
+    final child = _activeChild;
+    if (analysis == null || child == null) {
+      return const SizedBox.shrink();
+    }
+
+    final summary = patternSummaryText(analysis);
+
+    return Semantics(
+      label: 'Lihat pola. $summary',
+      button: true,
+      child: Container(
+        key: const Key('home_pattern_entry_card'),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE3EEDF),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PatternScreen(
+                    analysis: analysis,
+                    childId: child.id,
+                  ),
+                ),
+              );
+            },
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 64),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1F5C4A).withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.insights_rounded,
+                        size: 20,
+                        color: Color(0xFF1F5C4A),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Lihat pola',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF1E2A24),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            summary,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: const Color(0xFF6F7B74),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      size: 22,
+                      color: Color(0xFF1F5C4A),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildEventNoteButton() {
     return Column(
       children: [
@@ -2241,6 +2347,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         // Ringkasan Episode Kenaikan BPM yang ringkas (jika data analisis tersedia)
                         if (_analysisData != null) ...[
                           _buildEpisodesSummaryCard(),
+                          const SizedBox(height: 14),
+                          _buildPatternEntryCard(),
                           const SizedBox(height: 18),
                         ] else
                           const SizedBox(height: 2),
