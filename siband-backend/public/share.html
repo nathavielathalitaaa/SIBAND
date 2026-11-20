@@ -13,12 +13,17 @@
       margin: 0;
       padding: 0;
     }
+    html, body {
+      max-width: 100%;
+      overflow-x: hidden;
+    }
     body {
       background-color: #F6F4EF;
       color: #1E2A24;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      line-height: 1.5;
-      padding: 24px 16px;
+      font-size: 16px;
+      line-height: 1.55;
+      padding: 20px 16px 36px;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
@@ -26,110 +31,210 @@
     }
     .container {
       width: 100%;
-      max-width: 600px;
+      max-width: 100%;
+      min-width: 0;
+    }
+    .brand-header {
+      background-color: #E3EEDF;
+      border-radius: 20px;
+      box-shadow: 0 4px 16px rgba(30, 42, 36, 0.06);
+      padding: 20px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .brand-top {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    .brand-identity {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+      flex: 1 1 220px;
+    }
+    .brand-logo {
+      flex: 0 0 40px;
+      width: 40px;
+      height: 40px;
+      display: block;
+    }
+    .brand-titles {
+      min-width: 0;
+    }
+    .brand-name {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #1F5C4A;
+      line-height: 1.2;
+    }
+    .brand-header h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: #1E2A24;
+      line-height: 1.25;
+      margin-top: 2px;
+    }
+    .header-sub {
+      font-size: 15px;
+      color: rgba(30, 42, 36, 0.8);
+      margin-top: 4px;
+      overflow-wrap: anywhere;
+    }
+    .header-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(31, 92, 74, 0.14);
     }
     .badge {
       display: inline-flex;
       align-items: center;
       padding: 4px 12px;
       border-radius: 9999px;
-      font-size: 12px;
-      font-weight: 500;
-      background-color: #E3EEDF;
-      color: #1F5C4A;
-      margin-bottom: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      background-color: #1F5C4A;
+      color: #F6F4EF;
     }
-    .header {
-      margin-bottom: 20px;
+    .privacy-note {
+      font-size: 14px;
+      color: rgba(30, 42, 36, 0.82);
     }
-    .header h1 {
-      font-size: 24px;
-      font-weight: 700;
-      color: #1E2A24;
-      line-height: 1.2;
-      margin-bottom: 4px;
+    .print-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px;
+      padding: 10px 16px;
+      border: 0;
+      border-radius: 12px;
+      background-color: #1F5C4A;
+      color: #F6F4EF;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(31, 92, 74, 0.22);
     }
-    .header-sub {
-      font-size: 15px;
-      color: #6F7B74;
+    .print-btn:hover {
+      background-color: rgba(31, 92, 74, 0.9);
+    }
+    .print-btn:focus-visible {
+      outline: 3px solid #1E2A24;
+      outline-offset: 2px;
+    }
+    .content-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 20px;
+      align-items: start;
+    }
+    .grid-column {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      min-width: 0;
     }
     .card {
-      background: #FFFFFF;
-      border-radius: 16px;
-      border: 1px solid #D9DED6;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+      background-color: #E3EEDF;
+      border-radius: 20px;
+      box-shadow: 0 4px 14px rgba(30, 42, 36, 0.06);
       padding: 20px;
-      margin-bottom: 16px;
+      min-width: 0;
+    }
+    .card-amber {
+      background-color: rgba(232, 162, 79, 0.14);
     }
     .card-title {
-      font-size: 16px;
-      font-weight: 600;
+      font-size: 18px;
+      font-weight: 700;
       color: #1E2A24;
-      margin-bottom: 14px;
+      line-height: 1.3;
+      margin-bottom: 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 8px;
     }
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
     }
     .stat-box {
-      background: #F9FAF8;
-      border: 1px solid #E5E9E2;
-      border-radius: 12px;
-      padding: 12px;
+      background-color: #F6F4EF;
+      border-radius: 14px;
+      padding: 14px;
+      min-width: 0;
     }
     .stat-label {
-      font-size: 12px;
-      color: #6F7B74;
-      margin-bottom: 4px;
+      font-size: 13px;
+      color: rgba(30, 42, 36, 0.78);
+      margin-bottom: 6px;
     }
     .stat-value {
-      font-size: 18px;
+      font-size: 22px;
       font-weight: 700;
       color: #1F5C4A;
-    }
-    .baseline-badge {
-      display: inline-block;
-      padding: 8px 12px;
-      border-radius: 10px;
-      background: #E3EEDF;
-      color: #1F5C4A;
-      font-size: 13px;
-      font-weight: 500;
+      line-height: 1.2;
+      overflow-wrap: anywhere;
     }
     .baseline-insufficient {
       display: inline-block;
-      padding: 8px 12px;
-      border-radius: 10px;
-      background: #F3F4F6;
-      color: #6F7B74;
-      font-size: 13px;
+      padding: 10px 14px;
+      border-radius: 12px;
+      background-color: rgba(217, 222, 214, 0.65);
+      color: #1E2A24;
+      font-size: 15px;
+      font-weight: 500;
     }
     .chart-container {
       width: 100%;
       overflow-x: auto;
-      padding-top: 8px;
+      padding: 12px 8px 6px;
+      background-color: #F6F4EF;
+      border-radius: 14px;
+    }
+    .trend-svg {
+      display: block;
+      height: 176px;
+      min-width: 100%;
     }
     .chart-legend {
       display: flex;
-      gap: 16px;
-      margin-top: 12px;
-      font-size: 12px;
-      color: #6F7B74;
+      gap: 10px 18px;
+      margin-top: 14px;
+      font-size: 14px;
+      color: rgba(30, 42, 36, 0.82);
       flex-wrap: wrap;
     }
     .legend-item {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
     }
     .legend-color {
       width: 12px;
       height: 12px;
-      border-radius: 3px;
+      border-radius: 4px;
+      flex: 0 0 12px;
     }
     .tag-list {
       display: flex;
@@ -138,99 +243,234 @@
       margin-bottom: 14px;
     }
     .type-tag {
-      padding: 4px 10px;
-      border-radius: 8px;
-      background: #F0F4EF;
+      padding: 6px 12px;
+      border-radius: 9999px;
+      background-color: #E3EEDF;
       color: #1F5C4A;
-      font-size: 12px;
-      font-weight: 500;
+      font-size: 13px;
+      font-weight: 600;
     }
     .event-item {
-      padding: 12px;
-      border-radius: 10px;
-      background: #F9FAF8;
-      border: 1px solid #E5E9E2;
-      margin-bottom: 8px;
+      padding: 14px;
+      border-radius: 14px;
+      background-color: #F6F4EF;
+      margin-bottom: 10px;
     }
     .event-item:last-child {
       margin-bottom: 0;
     }
     .event-header {
       display: flex;
+      flex-wrap: wrap;
       justify-content: space-between;
-      align-items: center;
-      margin-bottom: 4px;
+      align-items: baseline;
+      gap: 6px 12px;
+      margin-bottom: 6px;
     }
     .event-type {
-      font-size: 13px;
-      font-weight: 600;
+      font-size: 15px;
+      font-weight: 700;
       color: #1E2A24;
     }
     .event-time {
-      font-size: 11px;
-      color: #6F7B74;
+      font-size: 13px;
+      color: rgba(30, 42, 36, 0.78);
     }
     .event-note {
-      font-size: 12px;
-      color: #4B5563;
+      font-size: 15px;
+      color: rgba(30, 42, 36, 0.88);
+      overflow-wrap: anywhere;
     }
     .empty-text {
-      font-size: 13px;
-      color: #6F7B74;
-      font-style: italic;
+      font-size: 15px;
+      color: rgba(30, 42, 36, 0.78);
       text-align: center;
-      padding: 16px 0;
+      padding: 20px 12px;
+      background-color: #F6F4EF;
+      border-radius: 14px;
     }
     .footer-note {
-      font-size: 11px;
-      color: #6F7B74;
+      font-size: 13px;
+      color: rgba(30, 42, 36, 0.78);
       text-align: center;
-      line-height: 1.5;
-      margin-top: 8px;
-      padding: 12px 16px;
+      line-height: 1.55;
+      margin-top: 20px;
+      padding: 14px 16px;
+      background-color: rgba(217, 222, 214, 0.35);
+      border-radius: 16px;
+    }
+    .state-wrapper {
+      width: 100%;
+      max-width: 480px;
+      margin: 48px auto;
     }
     .state-message {
-      padding: 48px 16px;
+      padding: 40px 24px;
       text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
     }
-    .state-icon {
-      width: 48px;
-      height: 48px;
-      margin-bottom: 16px;
-      display: inline-block;
+    .state-icon-box {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      background-color: #F6F4EF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .state-title {
-      font-size: 16px;
+      font-size: 18px;
       font-weight: 600;
       color: #1E2A24;
-      margin-bottom: 8px;
+      line-height: 1.4;
     }
-    .spinner {
-      border: 3px solid #E3EEDF;
-      border-top: 3px solid #1F5C4A;
-      border-radius: 50%;
-      width: 36px;
-      height: 36px;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 16px auto;
+    .spin-svg {
+      animation: spin 1.2s linear infinite;
     }
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+    @media (prefers-reduced-motion: reduce) {
+      .spin-svg {
+        animation: none;
+      }
+    }
+    @media (min-width: 700px) {
+      body {
+        padding: 28px 24px 44px;
+      }
+      .container {
+        max-width: 720px;
+      }
+      .card-title {
+        font-size: 19px;
+      }
+      .stat-value {
+        font-size: 24px;
+      }
+    }
+    @media (min-width: 900px) {
+      body {
+        padding: 32px 28px 48px;
+      }
+      .container {
+        max-width: 1080px;
+      }
+      .brand-header {
+        padding: 24px 28px;
+        margin-bottom: 24px;
+      }
+      .brand-header h1 {
+        font-size: 24px;
+      }
+      .content-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+        gap: 24px;
+      }
+      .grid-column {
+        gap: 24px;
+      }
+      .card {
+        padding: 24px;
+      }
+      .card-title {
+        font-size: 20px;
+      }
+      .stat-value {
+        font-size: 26px;
+      }
+      .trend-svg {
+        height: 220px;
+      }
+    }
+    @media print {
+      @page {
+        margin: 14mm;
+      }
+      body {
+        background-color: #FFFFFF;
+        color: #000000;
+        padding: 0;
+        font-size: 14px;
+      }
+      .container {
+        max-width: 100%;
+      }
+      .brand-header,
+      .card,
+      .card-amber,
+      .stat-box,
+      .event-item,
+      .chart-container,
+      .empty-text,
+      .footer-note {
+        background-color: #FFFFFF;
+        color: #000000;
+        box-shadow: none;
+        border: 1px solid #D9DED6;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .print-btn {
+        display: none;
+      }
+      .content-grid {
+        display: block;
+      }
+      .grid-column {
+        display: block;
+      }
+      .card,
+      .brand-header {
+        margin-bottom: 14px;
+      }
+      .brand-name,
+      .brand-header h1,
+      .header-sub,
+      .privacy-note,
+      .card-title,
+      .stat-label,
+      .stat-value,
+      .event-type,
+      .event-time,
+      .event-note,
+      .chart-legend,
+      .footer-note {
+        color: #000000;
+      }
+      .badge,
+      .type-tag,
+      .baseline-insufficient {
+        background-color: #FFFFFF;
+        color: #000000;
+        border: 1px solid #1E2A24;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="container" id="app">
-    <div class="card state-message" id="loading-card">
-      <div class="spinner"></div>
-      <div class="state-title">Memuat data rekap...</div>
+  <main class="container" id="app" aria-live="polite">
+    <div class="state-wrapper">
+      <div class="card state-message" id="loading-card" role="status">
+        <div class="state-icon-box" aria-hidden="true">
+          <svg class="spin-svg" width="28" height="28" viewBox="0 0 28 28" aria-hidden="true">
+            <circle cx="14" cy="14" r="10" fill="none" stroke="#D9DED6" stroke-width="3"></circle>
+            <path d="M14 4 A10 10 0 0 1 24 14" fill="none" stroke="#1F5C4A" stroke-width="3" stroke-linecap="round"></path>
+          </svg>
+        </div>
+        <h1 class="state-title">Memuat data rekap...</h1>
+      </div>
     </div>
-  </div>
+  </main>
 
   <script>
     (function() {
       var app = document.getElementById('app');
+      var svgNS = 'http://www.w3.org/2000/svg';
 
       // 1. Baca token dari location.hash (bagian setelah #), BUKAN dari path atau query
       var rawHash = window.location.hash || '';
@@ -241,19 +481,127 @@
         window.history.replaceState(null, '', window.location.pathname + window.location.search);
       }
 
+      function createSvgEl(tag, attrs) {
+        var el = document.createElementNS(svgNS, tag);
+        if (attrs) {
+          var keys = Object.keys(attrs);
+          for (var i = 0; i < keys.length; i++) {
+            el.setAttribute(keys[i], attrs[keys[i]]);
+          }
+        }
+        return el;
+      }
+
+      function createBrandLogoSvg() {
+        var svg = createSvgEl('svg', {
+          'class': 'brand-logo',
+          'width': '40',
+          'height': '40',
+          'viewBox': '0 0 40 40',
+          'aria-hidden': 'true'
+        });
+        svg.appendChild(createSvgEl('rect', {
+          'x': '0',
+          'y': '0',
+          'width': '40',
+          'height': '40',
+          'rx': '11',
+          'fill': '#E3EEDF',
+          'stroke': '#D9DED6',
+          'stroke-width': '1'
+        }));
+        svg.appendChild(createSvgEl('path', {
+          'd': 'M28.8 10 C22.4 6.4 10.4 8 10.4 14.4 C10.4 19.2 16 19.2 18.4 19.2 L21.2 14 L24 22 C29.6 23.2 30.4 31.2 20.8 32 C15.2 32.4 10.8 30.4 9.6 28.8',
+          'fill': 'none',
+          'stroke': '#1F5C4A',
+          'stroke-width': '3.2',
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round'
+        }));
+        svg.appendChild(createSvgEl('circle', {
+          'cx': '21.2',
+          'cy': '14',
+          'r': '3',
+          'fill': '#E8A24F'
+        }));
+        return svg;
+      }
+
+      function createErrorIconSvg() {
+        var svg = createSvgEl('svg', {
+          'width': '28',
+          'height': '28',
+          'viewBox': '0 0 28 28',
+          'aria-hidden': 'true'
+        });
+        svg.appendChild(createSvgEl('circle', {
+          'cx': '14',
+          'cy': '14',
+          'r': '11',
+          'fill': 'none',
+          'stroke': '#E8A24F',
+          'stroke-width': '2.4'
+        }));
+        svg.appendChild(createSvgEl('line', {
+          'x1': '14',
+          'y1': '8.5',
+          'x2': '14',
+          'y2': '15.5',
+          'stroke': '#1E2A24',
+          'stroke-width': '2.4',
+          'stroke-linecap': 'round'
+        }));
+        svg.appendChild(createSvgEl('circle', {
+          'cx': '14',
+          'cy': '19.5',
+          'r': '1.5',
+          'fill': '#1E2A24'
+        }));
+        return svg;
+      }
+
+      function createPrintIconSvg() {
+        var svg = createSvgEl('svg', {
+          'width': '16',
+          'height': '16',
+          'viewBox': '0 0 24 24',
+          'aria-hidden': 'true'
+        });
+        svg.appendChild(createSvgEl('path', {
+          'd': 'M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z',
+          'fill': 'none',
+          'stroke': '#F6F4EF',
+          'stroke-width': '2',
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round'
+        }));
+        return svg;
+      }
+
       function showErrorState() {
         while (app.firstChild) {
           app.removeChild(app.firstChild);
         }
-        var errorCard = document.createElement('div');
-        errorCard.className = 'card state-message';
+        var wrapper = document.createElement('div');
+        wrapper.className = 'state-wrapper';
 
-        var title = document.createElement('div');
+        var errorCard = document.createElement('div');
+        errorCard.className = 'card card-amber state-message';
+        errorCard.setAttribute('role', 'status');
+
+        var iconBox = document.createElement('div');
+        iconBox.className = 'state-icon-box';
+        iconBox.setAttribute('aria-hidden', 'true');
+        iconBox.appendChild(createErrorIconSvg());
+        errorCard.appendChild(iconBox);
+
+        var title = document.createElement('h1');
         title.className = 'state-title';
         title.textContent = 'Tautan tidak ditemukan atau sudah tidak berlaku.';
         errorCard.appendChild(title);
 
-        app.appendChild(errorCard);
+        wrapper.appendChild(errorCard);
+        app.appendChild(wrapper);
       }
 
       // Validasi token ada dan tidak kosong
@@ -321,6 +669,20 @@
         return periodStr;
       }
 
+      function createStatBox(label, value) {
+        var box = document.createElement('div');
+        box.className = 'stat-box';
+        var lbl = document.createElement('div');
+        lbl.className = 'stat-label';
+        lbl.textContent = label;
+        var val = document.createElement('div');
+        val.className = 'stat-value';
+        val.textContent = value;
+        box.appendChild(lbl);
+        box.appendChild(val);
+        return box;
+      }
+
       function renderPage(payload) {
         while (app.firstChild) {
           app.removeChild(app.firstChild);
@@ -337,65 +699,104 @@
 
         var isBaselineSufficient = Boolean(baseline && baseline.sufficient);
 
-        // Header Section
-        var header = document.createElement('div');
-        header.className = 'header';
+        // Header Merek
+        var header = document.createElement('header');
+        header.className = 'brand-header';
 
-        var badge = document.createElement('div');
-        badge.className = 'badge';
-        badge.textContent = 'Tautan baca-saja. Data bersifat pribadi.';
-        header.appendChild(badge);
+        var brandTop = document.createElement('div');
+        brandTop.className = 'brand-top';
+
+        var brandIdentity = document.createElement('div');
+        brandIdentity.className = 'brand-identity';
+        brandIdentity.appendChild(createBrandLogoSvg());
+
+        var brandTitles = document.createElement('div');
+        brandTitles.className = 'brand-titles';
+
+        var brandName = document.createElement('div');
+        brandName.className = 'brand-name';
+        brandName.textContent = 'Siband';
+        brandTitles.appendChild(brandName);
 
         var h1 = document.createElement('h1');
         h1.textContent = 'Rekap untuk terapis';
-        header.appendChild(h1);
+        brandTitles.appendChild(h1);
 
         var sub = document.createElement('div');
         sub.className = 'header-sub';
         sub.textContent = nickname + (periode ? ' \u2022 Periode ' + formatMonthPeriod(periode) : '');
-        header.appendChild(sub);
+        brandTitles.appendChild(sub);
 
+        brandIdentity.appendChild(brandTitles);
+        brandTop.appendChild(brandIdentity);
+
+        var actions = document.createElement('div');
+        actions.className = 'header-actions';
+
+        var printBtn = document.createElement('button');
+        printBtn.type = 'button';
+        printBtn.className = 'print-btn';
+        printBtn.appendChild(createPrintIconSvg());
+        var printLabel = document.createElement('span');
+        printLabel.textContent = 'Cetak / Simpan PDF';
+        printBtn.appendChild(printLabel);
+        printBtn.addEventListener('click', function() {
+          window.print();
+        });
+        actions.appendChild(printBtn);
+
+        brandTop.appendChild(actions);
+        header.appendChild(brandTop);
+
+        var badgeRow = document.createElement('div');
+        badgeRow.className = 'badge-row';
+
+        var badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.textContent = 'Tautan baca-saja';
+        badgeRow.appendChild(badge);
+
+        var privacyNote = document.createElement('span');
+        privacyNote.className = 'privacy-note';
+        privacyNote.textContent = 'Tautan baca-saja. Data bersifat pribadi.';
+        badgeRow.appendChild(privacyNote);
+
+        header.appendChild(badgeRow);
         app.appendChild(header);
 
-        // Card 1: Ringkasan
-        var summaryCard = document.createElement('div');
+        // Wadah dua kolom desktop (>= 900px)
+        var contentGrid = document.createElement('div');
+        contentGrid.className = 'content-grid';
+
+        var leftCol = document.createElement('div');
+        leftCol.className = 'grid-column';
+
+        var rightCol = document.createElement('div');
+        rightCol.className = 'grid-column';
+
+        // Kolom Kiri - Card 1: Ringkasan Aktivitas
+        var summaryCard = document.createElement('section');
         summaryCard.className = 'card';
 
-        var summaryTitle = document.createElement('div');
+        var summaryTitle = document.createElement('h2');
         summaryTitle.className = 'card-title';
         summaryTitle.textContent = 'Ringkasan Aktivitas';
         summaryCard.appendChild(summaryTitle);
 
         var grid = document.createElement('div');
         grid.className = 'stats-grid';
-
-        function createStatBox(label, value) {
-          var box = document.createElement('div');
-          box.className = 'stat-box';
-          var lbl = document.createElement('div');
-          lbl.className = 'stat-label';
-          lbl.textContent = label;
-          var val = document.createElement('div');
-          val.className = 'stat-value';
-          val.textContent = value;
-          box.appendChild(lbl);
-          box.appendChild(val);
-          return box;
-        }
-
         grid.appendChild(createStatBox('Rata-rata BPM', rekap.rata_rata != null ? rekap.rata_rata + ' BPM' : '-'));
         grid.appendChild(createStatBox('Maksimum BPM', rekap.maksimum != null ? rekap.maksimum + ' BPM' : '-'));
         grid.appendChild(createStatBox('Jumlah Bacaan', (rekap.jumlah_sampel != null ? rekap.jumlah_sampel : 0) + ' sampel'));
         grid.appendChild(createStatBox('Hari Tersinkron', (rekap.jumlah_hari != null ? rekap.jumlah_hari : 0) + ' hari'));
-
         summaryCard.appendChild(grid);
-        app.appendChild(summaryCard);
+        leftCol.appendChild(summaryCard);
 
-        // Card 2: Baseline
-        var baselineCard = document.createElement('div');
+        // Kolom Kiri - Card 2: Baseline Detak Jantung
+        var baselineCard = document.createElement('section');
         baselineCard.className = 'card';
 
-        var baselineTitle = document.createElement('div');
+        var baselineTitle = document.createElement('h2');
         baselineTitle.className = 'card-title';
         baselineTitle.textContent = 'Baseline Detak Jantung';
         baselineCard.appendChild(baselineTitle);
@@ -414,13 +815,13 @@
           noBase.textContent = 'Baseline belum cukup data';
           baselineCard.appendChild(noBase);
         }
-        app.appendChild(baselineCard);
+        leftCol.appendChild(baselineCard);
 
-        // Card 3: Grafik Batang per Hari
-        var chartCard = document.createElement('div');
+        // Kolom Kanan - Card 3: Tren Detak Jantung Harian
+        var chartCard = document.createElement('section');
         chartCard.className = 'card';
 
-        var chartTitle = document.createElement('div');
+        var chartTitle = document.createElement('h2');
         chartTitle.className = 'card-title';
         chartTitle.textContent = 'Tren Detak Jantung Harian';
         chartCard.appendChild(chartTitle);
@@ -434,12 +835,11 @@
           var chartWrapper = document.createElement('div');
           chartWrapper.className = 'chart-container';
 
-          var svgNS = 'http://www.w3.org/2000/svg';
-          var svgWidth = Math.max(340, ringkasanPerHari.length * 36 + 40);
-          var svgHeight = 160;
+          var svgWidth = Math.max(360, ringkasanPerHari.length * 40 + 48);
+          var svgHeight = 220;
           var padLeft = 32;
-          var padBottom = 28;
-          var padTop = 20;
+          var padBottom = 30;
+          var padTop = 24;
           var usableHeight = svgHeight - padTop - padBottom;
 
           var maxVal = 140;
@@ -448,24 +848,26 @@
             if (itemVal > maxVal) maxVal = itemVal + 10;
           }
 
-          var svg = document.createElementNS(svgNS, 'svg');
-          svg.setAttribute('viewBox', '0 0 ' + svgWidth + ' ' + svgHeight);
-          svg.setAttribute('width', svgWidth.toString());
-          svg.setAttribute('height', svgHeight.toString());
-          svg.style.display = 'block';
+          var svg = createSvgEl('svg', {
+            'class': 'trend-svg',
+            'viewBox': '0 0 ' + svgWidth + ' ' + svgHeight,
+            'width': svgWidth.toString(),
+            'role': 'img',
+            'aria-label': 'Grafik batang tren detak jantung harian'
+          });
 
-          // Base horizontal axis
-          var axisLine = document.createElementNS(svgNS, 'line');
-          axisLine.setAttribute('x1', padLeft.toString());
-          axisLine.setAttribute('y1', (svgHeight - padBottom).toString());
-          axisLine.setAttribute('x2', svgWidth.toString());
-          axisLine.setAttribute('y2', (svgHeight - padBottom).toString());
-          axisLine.setAttribute('stroke', '#D9DED6');
-          axisLine.setAttribute('stroke-width', '1');
-          svg.appendChild(axisLine);
+          // Garis sumbu horizontal dasar
+          svg.appendChild(createSvgEl('line', {
+            'x1': padLeft.toString(),
+            'y1': (svgHeight - padBottom).toString(),
+            'x2': svgWidth.toString(),
+            'y2': (svgHeight - padBottom).toString(),
+            'stroke': '#D9DED6',
+            'stroke-width': '1.5'
+          }));
 
-          var barWidth = 18;
-          var step = (svgWidth - padLeft - 10) / ringkasanPerHari.length;
+          var barWidth = 20;
+          var step = (svgWidth - padLeft - 12) / ringkasanPerHari.length;
 
           for (var d = 0; d < ringkasanPerHari.length; d++) {
             var dayData = ringkasanPerHari[d];
@@ -473,37 +875,38 @@
             var dayAbove = dayData.bacaan_di_atas_p75 || 0;
             var isAlertDay = isBaselineSufficient && dayAbove > 0;
 
-            var barH = Math.max(4, (dayAvg / maxVal) * usableHeight);
+            var barH = Math.max(6, (dayAvg / maxVal) * usableHeight);
             var xPos = padLeft + d * step + (step - barWidth) / 2;
             var yPos = (svgHeight - padBottom) - barH;
 
-            var bar = document.createElementNS(svgNS, 'rect');
-            bar.setAttribute('x', xPos.toFixed(1));
-            bar.setAttribute('y', yPos.toFixed(1));
-            bar.setAttribute('width', barWidth.toString());
-            bar.setAttribute('height', barH.toFixed(1));
-            bar.setAttribute('rx', '4');
-            bar.setAttribute('fill', isAlertDay ? '#E8A24F' : '#1F5C4A');
-            svg.appendChild(bar);
+            svg.appendChild(createSvgEl('rect', {
+              'x': xPos.toFixed(1),
+              'y': yPos.toFixed(1),
+              'width': barWidth.toString(),
+              'height': barH.toFixed(1),
+              'rx': '5',
+              'fill': isAlertDay ? '#E8A24F' : '#1F5C4A'
+            }));
 
-            // BPM label on top of bar
-            var valTxt = document.createElementNS(svgNS, 'text');
-            valTxt.setAttribute('x', (xPos + barWidth / 2).toFixed(1));
-            valTxt.setAttribute('y', Math.max(12, yPos - 4).toFixed(1));
-            valTxt.setAttribute('text-anchor', 'middle');
-            valTxt.setAttribute('font-size', '9');
-            valTxt.setAttribute('fill', '#1E2A24');
+            var valTxt = createSvgEl('text', {
+              'x': (xPos + barWidth / 2).toFixed(1),
+              'y': Math.max(14, yPos - 6).toFixed(1),
+              'text-anchor': 'middle',
+              'font-size': '11',
+              'font-weight': '600',
+              'fill': '#1E2A24'
+            });
             valTxt.textContent = Math.round(dayAvg).toString();
             svg.appendChild(valTxt);
 
-            // Date label below axis
             var dateLabel = dayData.tanggal ? dayData.tanggal.split('-').pop() : (d + 1).toString();
-            var dTxt = document.createElementNS(svgNS, 'text');
-            dTxt.setAttribute('x', (xPos + barWidth / 2).toFixed(1));
-            dTxt.setAttribute('y', (svgHeight - 10).toString());
-            dTxt.setAttribute('text-anchor', 'middle');
-            dTxt.setAttribute('font-size', '10');
-            dTxt.setAttribute('fill', '#6F7B74');
+            var dTxt = createSvgEl('text', {
+              'x': (xPos + barWidth / 2).toFixed(1),
+              'y': (svgHeight - 10).toString(),
+              'text-anchor': 'middle',
+              'font-size': '11',
+              'fill': '#6F7B74'
+            });
             dTxt.textContent = dateLabel;
             svg.appendChild(dTxt);
           }
@@ -511,7 +914,6 @@
           chartWrapper.appendChild(svg);
           chartCard.appendChild(chartWrapper);
 
-          // Legend
           var legend = document.createElement('div');
           legend.className = 'chart-legend';
 
@@ -539,13 +941,13 @@
 
           chartCard.appendChild(legend);
         }
-        app.appendChild(chartCard);
+        rightCol.appendChild(chartCard);
 
-        // Card 4: Catatan Kejadian
-        var notesCard = document.createElement('div');
-        notesCard.className = 'card';
+        // Kolom Kanan - Card 4: Catatan Kejadian
+        var notesCard = document.createElement('section');
+        notesCard.className = 'card card-amber';
 
-        var notesTitle = document.createElement('div');
+        var notesTitle = document.createElement('h2');
         notesTitle.className = 'card-title';
         notesTitle.textContent = 'Catatan Kejadian';
         notesCard.appendChild(notesTitle);
@@ -599,12 +1001,16 @@
             notesCard.appendChild(evItem);
           }
         }
-        app.appendChild(notesCard);
+        rightCol.appendChild(notesCard);
 
-        // Footer Card: Catatan Kaki Wajib
-        var footer = document.createElement('div');
+        contentGrid.appendChild(leftCol);
+        contentGrid.appendChild(rightCol);
+        app.appendChild(contentGrid);
+
+        // Catatan Kaki
+        var footer = document.createElement('footer');
         footer.className = 'footer-note';
-        footer.textContent = 'Detak jantung dari jam tangan konsumen; perubahan detak jantung bukan bukti stres dan bukan diagnosis. Data ini pelengkap observasi, bukan pengganti penilaian profesional.';
+        footer.textContent = 'Detak jantung dari jam tangan konsumen; perubahan detak jantung bukan bukti diagnosis. Data ini pelengkap observasi, bukan pengganti penilaian profesional.';
         app.appendChild(footer);
       }
     })();
