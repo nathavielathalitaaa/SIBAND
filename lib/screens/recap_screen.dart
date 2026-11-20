@@ -1426,7 +1426,10 @@ class _RecapScreenState extends State<RecapScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -1443,7 +1446,6 @@ class _RecapScreenState extends State<RecapScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 8),
                             Text(
                               'Kedaluwarsa: ${_formatDateTimeString(expiresAt)}',
                               style: GoogleFonts.inter(

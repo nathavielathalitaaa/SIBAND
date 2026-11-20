@@ -156,5 +156,43 @@ void main() {
       // Verify copy button
       expect(find.widgetWithText(ElevatedButton, 'Salin Tautan'), findsOneWidget);
     });
+
+    testWidgets('Kartu Tautan Berbagi Aktif tidak overflow di layar 360x640', (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(buildTestable(
+        RecapScreen(
+          initialChildren: mockChildren,
+          initialRecapData: {
+            'periode': '2026-11',
+            'jumlah_sampel': 10,
+            'jumlah_hari': 1,
+            'ringkasan_per_hari': [],
+            'catatan_kejadian': {'daftar': []},
+          },
+          initialShareLinks: const [
+            {
+              'id': 1,
+              'status': 'active',
+              'expires_at': '2026-11-27T10:44:00Z',
+              'last_accessed_at': null,
+              'revoked_at': null,
+            },
+          ],
+        ),
+        size: const Size(360, 640),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Tautan Berbagi Aktif'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Tautan Berbagi Aktif'), findsOneWidget);
+      expect(find.text('Aktif'), findsOneWidget);
+      expect(find.text('Cabut'), findsOneWidget);
+    });
   });
 }
