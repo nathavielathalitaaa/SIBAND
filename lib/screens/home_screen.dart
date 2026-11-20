@@ -11,6 +11,7 @@ import '../utils/event_type_helper.dart';
 import '../widgets/heartbeat_pulse.dart';
 import '../widgets/home_monitoring_chart_card.dart';
 import '../widgets/thin_line_logo.dart';
+import '../widgets/watch_status_chip.dart';
 import 'event_note_screen.dart';
 import 'pair_device_screen.dart';
 
@@ -22,6 +23,7 @@ class HomeScreen extends StatefulWidget {
   final Future<List<ChildModel>> Function()? onFetchChildren;
   final AnalysisModel? initialAnalysisData;
   final ApiService? apiService;
+  final HeartRateService? heartRateService;
 
   const HomeScreen({
     super.key,
@@ -32,6 +34,7 @@ class HomeScreen extends StatefulWidget {
     this.onFetchChildren,
     this.initialAnalysisData,
     this.apiService,
+    this.heartRateService,
   });
 
   @override
@@ -40,7 +43,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late final ApiService _apiService;
-  final HeartRateService _hrService = HeartRateService.instance;
+  late final HeartRateService _hrService;
 
   static const String activeChildIdKey = 'active_child_id';
 
@@ -64,6 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _apiService = widget.apiService ?? ApiService();
+    _hrService = widget.heartRateService ?? HeartRateService.instance;
     _analysisData = widget.initialAnalysisData;
 
     _hrService.start();
@@ -474,9 +478,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }) {
     final bool isBleMode = _hrService.currentMode == Mode.ble;
     final HrSensorStatus bleStatus = _hrService.sensorStatus;
-    final bool hasFreshLocalBleReading = _hrService.lastBpmReceivedAt != null &&
-        _hrService.currentBpm > 0 &&
-        _hrService.secondsSinceLastBpm <= staleAfterSeconds;
+    final bool hasFreshLocalBleReading = hasFreshLocalBleReadingForWatch(
+      _hrService,
+      staleAfterSeconds: staleAfterSeconds,
+    );
 
     final bool hasBackendBpm = analysisCurrent?.bpm != null;
     final bool isBackendStale = analysisCurrent != null &&
@@ -955,6 +960,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  int get _currentStaleAfterSeconds =>
+      (_analysisData?.meta.parameters['stale_after_seconds'] as num?)
+          ?.toInt() ??
+      kDefaultWatchStaleAfterSeconds;
+
   Widget _buildHeader() {
     final activeChildName = _activeChild?.nickname ?? 'Pilih anak';
 
@@ -962,88 +972,87 @@ class _HomeScreenState extends State<HomeScreen> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Flexible(child: _buildLogo()),
-        const SizedBox(width: 8),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Semantics(
-              label: 'Notifikasi',
-              button: true,
-              child: IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                icon: const Icon(
-                  Icons.notifications_none_rounded,
-                  color: Color(0xFF1E2A24),
-                  size: 24,
+        const SizedBox(width: 6),
+        Flexible(
+          flex: 2,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Flexible(
+                child: WatchStatusChip(
+                  heartRateService: _hrService,
+                  staleAfterSeconds: _currentStaleAfterSeconds,
+                  activeChildId: _activeChild?.id,
+                  activeChildNickname: _activeChild?.nickname,
+                  onDeviceChanged: () {
+                    if (_activeChild != null) {
+                      _fetchStatsForChild(_activeChild!.id);
+                    }
+                  },
                 ),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Notifikasi belum tersedia'),
-                    ),
-                  );
-                },
               ),
-            ),
-            const SizedBox(width: 6),
-            Semantics(
-              label: 'Ganti Anak Aktif: $activeChildName',
-              button: true,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: _showChildSwitcherSheet,
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 130),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
+              const SizedBox(width: 6),
+              Flexible(
+                child: Semantics(
+                  label: 'Ganti Anak Aktif: $activeChildName',
+                  button: true,
+                  child: InkWell(
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFFD9DED6)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
+                    onTap: _showChildSwitcherSheet,
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 130),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
                       ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.face_outlined,
-                        size: 16,
-                        color: Color(0xFF1F5C4A),
-                      ),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          activeChildName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF1E2A24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFFD9DED6)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
                           ),
-                        ),
+                        ],
                       ),
-                      const SizedBox(width: 2),
-                      const Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        size: 16,
-                        color: Color(0xFF6F7B74),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.face_outlined,
+                            size: 16,
+                            color: Color(0xFF1F5C4A),
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              activeChildName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF1E2A24),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 16,
+                            color: Color(0xFF6F7B74),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );

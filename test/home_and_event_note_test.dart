@@ -288,16 +288,15 @@ void main() {
       expect(find.text('Tambah Anak'), findsOneWidget);
     });
 
-    testWidgets('Tapping notification icon shows SnackBar', (tester) async {
+    testWidgets('Tapping watch status chip opens Status jam bottom sheet', (tester) async {
       await tester.pumpWidget(buildTestable(HomeScreen(initialChildren: mockChildren)));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.bySemanticsLabel('Notifikasi'));
-      await tester.pump();
-
-      expect(find.text('Notifikasi belum tersedia'), findsOneWidget);
-      await tester.pump(const Duration(seconds: 4));
+      await tester.tap(find.byKey(const Key('watch_status_chip')));
       await tester.pumpAndSettle();
+
+      expect(find.text('Status jam'), findsOneWidget);
+      expect(find.text('Pasang atau ganti jam'), findsOneWidget);
     });
 
     testWidgets('Banner tap triggers navigation to Panduan', (tester) async {
