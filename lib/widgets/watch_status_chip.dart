@@ -331,14 +331,18 @@ class _WatchStatusChipState extends State<WatchStatusChip>
                   ),
                 ],
                 const SizedBox(height: 18),
-                if (reconnectTarget != null &&
-                    resolution.state == WatchChipState.disconnected) ...[
+                if (hasPaired &&
+                    resolution.state != WatchChipState.connecting) ...[
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton(
                       onPressed: () {
                         Navigator.pop(sheetContext);
-                        _hrService.connectToDevice(reconnectTarget);
+                        if (reconnectTarget != null) {
+                          _hrService.connectToDevice(reconnectTarget);
+                        } else {
+                          _hrService.reconnectSavedWatch();
+                        }
                       },
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFF1F5C4A),

@@ -71,6 +71,7 @@ class HeartRateService extends ChangeNotifier {
 
   int _secondsSinceLastBpm = 0;
   int get secondsSinceLastBpm => _secondsSinceLastBpm;
+  int _secondsWaitingFirstBpm = 0;
 
   int _currentBpm = 75;
   int get currentBpm => _currentBpm;
@@ -168,6 +169,87 @@ class HeartRateService extends ChangeNotifier {
     if (_currentMode == Mode.dummy) {
       _startDummyMode();
     }
+    if (defaultTargetPlatform == TargetPlatform.android &&
+        _onRetriggerOverride == null) {
+      unawaited(_autoConnectIfPaired());
+    }
+  }
+
+  Future<void> _autoConnectIfPaired() async {
+    try {
+      await loadSavedDevice();
+      if (_pairedDeviceName == null || _pairedDeviceName!.trim().isEmpty) {
+        return;
+      }
+      await reconnectSavedWatch();
+    } catch (e) {
+      debugPrint('[HeartRateService] Gagal auto-connect jam tersimpan: $e');
+    }
+  }
+
+  /// Menyambungkan ulang smartwatch yang tersimpan / sudah bonded di HP.
+  Future<bool> reconnectSavedWatch() async {
+    if (_isConnectingBle) return false;
+    try {
+      await loadSavedDevice();
+      if (_connectedDevice != null) {
+        await _bleService.disconnect();
+      }
+      final bonded = await _bleService.getBondedDevices();
+      if (bonded.isEmpty) {
+        _bleStatus = 'Jam tidak ditemukan di Bluetooth HP';
+        notifyListeners();
+        return false;
+      }
+
+      BluetoothDevice target = bonded.first;
+      final saved = (_pairedDeviceName ?? '').trim().toLowerCase();
+      for (final d in bonded) {
+        final name = d.platformName.trim().toLowerCase();
+        if (saved.isNotEmpty && name == saved) {
+          target = d;
+          break;
+        }
+        if (name.contains('xwatch') || name.contains('h4')) {
+          target = d;
+        }
+      }
+
+      final resolvedName = target.platformName.isNotEmpty
+          ? target.platformName
+          : (_pairedDeviceName ?? target.remoteId.str);
+      if (_activeDeviceId != null) {
+        await setPairedDevice(
+          deviceId: _activeDeviceId!,
+          deviceName: resolvedName,
+        );
+      }
+      await connectToDevice(target);
+      return true;
+    } catch (e) {
+      debugPrint('[HeartRateService] Gagal sambungkan ulang jam: $e');
+      _bleStatus = 'Gagal menyambungkan ulang jam';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Memutus koneksi BLE dan menghapus pengaturan jam tersimpan untuk pasang ulang.
+  Future<void> resetPairedWatch() async {
+    await _bleBpmSubscription?.cancel();
+    _bleBpmSubscription = null;
+    await _deviceStateSubscription?.cancel();
+    _deviceStateSubscription = null;
+    await _bleService.disconnect();
+
+    _connectedDevice = null;
+    _isConnectingBle = false;
+    _needsDeviceRepair = false;
+    _attemptedRecoveryStages.clear();
+    _currentBleState = BluetoothConnectionState.disconnected;
+    _bleStatus = 'Belum ada jam terpasang';
+
+    await clearPairedDevice();
   }
 
   void stop() {
@@ -182,13 +264,33 @@ class HeartRateService extends ChangeNotifier {
     _staleCheckTimer?.cancel();
     _staleCheckTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (_lastBpmReceivedAt != null) {
+        _secondsWaitingFirstBpm = 0;
         final diff = DateTime.now().difference(_lastBpmReceivedAt!).inSeconds;
         if (_secondsSinceLastBpm != diff) {
           _secondsSinceLastBpm = diff;
           notifyListeners();
         }
         if (_currentMode == Mode.ble) {
+          if (_connectedDevice != null &&
+              _onRetriggerOverride == null &&
+              !_isRecoveringBle &&
+              diff > 0) {
+            if (diff % 180 == 0) {
+              unawaited(_reconnectCurrentDevice());
+            } else if (diff % 45 == 0) {
+              unawaited(_retriggerCurrentDevice());
+            }
+          }
           unawaited(_evaluateBleRecovery(diff));
+        }
+      } else if (_currentMode == Mode.ble &&
+          _connectedDevice != null &&
+          _onRetriggerOverride == null) {
+        _secondsWaitingFirstBpm++;
+        if (!_isRecoveringBle &&
+            _secondsWaitingFirstBpm > 0 &&
+            _secondsWaitingFirstBpm % 35 == 0) {
+          unawaited(_retriggerCurrentDevice());
         }
       }
     });

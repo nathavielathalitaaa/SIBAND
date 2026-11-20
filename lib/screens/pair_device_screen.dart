@@ -340,6 +340,16 @@ class _PairDeviceScreenState extends State<PairDeviceScreen> {
             color: const Color(0xFF1E2A24),
           ),
         ),
+        actions: [
+          Semantics(
+            label: 'Muat ulang daftar jam',
+            button: true,
+            child: IconButton(
+              icon: const Icon(Icons.refresh_rounded, color: Color(0xFF1F5C4A)),
+              onPressed: _isLoadingDevices ? null : _loadDevices,
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(

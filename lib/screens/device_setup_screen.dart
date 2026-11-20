@@ -29,6 +29,7 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
   static const Color _kTextMuted = Color(0xFF6F7B74);
 
   late final HeartRateService _hrService;
+  bool _isReconnecting = false;
 
   static const List<({String title, String detail})> _tutorialSteps = [
     (
@@ -83,6 +84,36 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
       ),
     );
     if (mounted) setState(() {});
+  }
+
+  Future<void> _handleReconnectWatch() async {
+    if (_isReconnecting) return;
+    setState(() => _isReconnecting = true);
+    final ok = await _hrService.reconnectSavedWatch();
+    if (!mounted) return;
+    setState(() => _isReconnecting = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok
+              ? 'Menyambungkan ulang smartwatch...'
+              : 'Jam tidak ditemukan di Bluetooth HP. Coba Pasang jam.',
+        ),
+        backgroundColor: ok ? _kGreen : _kText,
+      ),
+    );
+  }
+
+  Future<void> _handleResetWatchConnection() async {
+    await _hrService.resetPairedWatch();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Sambungan jam diatur ulang. Silakan pilih jam lagi.'),
+        backgroundColor: _kGreen,
+      ),
+    );
+    await _openPairDevice();
   }
 
   Future<void> _handleDataSourceSelection() async {
@@ -298,6 +329,70 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
               ),
             ),
           ),
+          if (hasWatch) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      key: const Key('device_setup_reconnect_button'),
+                      onPressed: _isReconnecting ? null : _handleReconnectWatch,
+                      icon: _isReconnecting
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: _kGreen,
+                              ),
+                            )
+                          : const Icon(Icons.refresh_rounded, size: 18),
+                      label: Text(
+                        'Sambungkan ulang',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _kGreen,
+                        side: const BorderSide(color: _kGreen),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  height: 48,
+                  child: TextButton(
+                    key: const Key('device_setup_reset_button'),
+                    onPressed: _handleResetWatchConnection,
+                    style: TextButton.styleFrom(
+                      foregroundColor: _kTextMuted,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      'Atur ulang',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
