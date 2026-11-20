@@ -10,7 +10,7 @@ import '../services/heart_rate_service.dart';
 import '../utils/event_type_helper.dart';
 import '../widgets/heartbeat_pulse.dart';
 import '../widgets/home_monitoring_chart_card.dart';
-import '../widgets/thin_line_logo.dart';
+import '../widgets/siband_logo.dart';
 import '../widgets/watch_status_chip.dart';
 import 'event_note_screen.dart';
 import 'guide_calming_screen.dart';
@@ -932,13 +932,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildLogo() {
-    return Image.asset(
-      'assets/home/logo.png',
-      height: 32,
-      errorBuilder: (context, error, stackTrace) {
-        return const SibandThinLineLogo(size: 30);
-      },
-    );
+    // Sementara, ganti dengan logo dari desain tim.
+    return const SibandLogo(size: 32);
   }
 
   int get _currentStaleAfterSeconds =>

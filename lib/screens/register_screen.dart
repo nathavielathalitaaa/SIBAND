@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
+import '../widgets/siband_logo.dart';
 import 'login_screen.dart';
 import 'main_navigation_screen.dart';
 
@@ -106,8 +107,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // Blok konten mulai ±12% tinggi layar (judul)
-                          SizedBox(height: height * 0.12),
+                          SizedBox(height: height * 0.06),
+                          // Sementara, ganti dengan logo dari desain tim.
+                          const Center(child: SibandLogo(size: 52)),
+                          const SizedBox(height: 14),
 
                           // Judul
                           Text(

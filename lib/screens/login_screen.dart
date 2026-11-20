@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
+import '../widgets/siband_logo.dart';
 import 'main_navigation_screen.dart';
 import 'register_screen.dart';
 
@@ -98,8 +99,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // Blok konten mulai ±35% tinggi layar (judul)
-                          SizedBox(height: height * 0.35),
+                          SizedBox(height: height * 0.20),
+                          // Sementara, ganti dengan logo dari desain tim.
+                          const Center(child: SibandLogo(size: 56)),
+                          const SizedBox(height: 16),
 
                           // Judul
                           Text(
